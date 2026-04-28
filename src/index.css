@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-primary: #12b3d6; /* Cyan khas logo klik-pilih */
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #4b5563; /* Dark gray */
+}
