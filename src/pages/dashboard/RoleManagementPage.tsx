@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useMemo } from 'react';
 import { useRBAC } from '@/hooks/useRBAC';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Shield, Plus, Pencil, Trash2, X, KeyRound, CheckSquare, Search, MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Shield, Plus, Pencil, Trash2, X, KeyRound, CheckSquare, Search, MoreVertical, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,25 +15,54 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const checkPermission = (menuName: string, action: string) => {
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return false;
+  try {
+    const user = JSON.parse(userStr);
+    if (user.roles?.some((r: any) => r.name === 'Superadmin')) return true;
+    for (const role of user.roles || []) {
+      for (const perm of role.permissions || []) {
+        if (perm.menu?.name === menuName && perm.action === action) {
+          return true;
+        }
+      }
+    }
+  } catch (e) {
+    return false;
+  }
+  return false;
+};
+
 export default function RoleManagementPage() {
   const { 
     roles, roleMeta, fetchRoles, saveRole, deleteRole, 
     permissions, fetchAllPermissions, assignPermissionsToRole, isLoading 
   } = useRBAC();
   
-  // State Pagination & Search
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // State Modal
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [formData, setFormData] = useState({ id: '', name: '', description: '' });
 
-  // State Assign Permissions
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<any>(null);
   const [checkedPermissions, setCheckedPermissions] = useState<number[]>([]);
+
+  // State modal konfirmasi delete
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const canCreate = checkPermission("Manajemen Role", "create");
+  const canUpdate = checkPermission("Manajemen Role", "update");
+  const canDelete = checkPermission("Manajemen Role", "delete");
+  const canAssign = checkPermission("Manajemen Role", "assign_permission");
+  const showActionsColumn = canUpdate || canDelete || canAssign;
+
+  const PROTECTED_ROLES = ['Superadmin', 'Admin', 'Client', 'Voter'];
 
   useEffect(() => {
     fetchRoles(currentPage, activeSearch);
@@ -88,6 +118,25 @@ export default function RoleManagementPage() {
     if (success) setIsAccessModalOpen(false);
   };
 
+  // Buka modal konfirmasi delete
+  const handleOpenDeleteModal = (role: any) => {
+    setDeleteTarget({ id: role.id.toString(), name: role.name });
+    setIsDeleteModalOpen(true);
+  };
+
+  // Eksekusi delete
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await deleteRole(deleteTarget.id, currentPage, activeSearch);
+      setIsDeleteModalOpen(false);
+      setDeleteTarget(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const renderPaginationButtons = () => {
     const buttons = [];
     const totalPages = roleMeta.total_pages || 1;
@@ -115,7 +164,6 @@ export default function RoleManagementPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       
-      {/* Header & Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Manajemen Role</h1>
@@ -138,13 +186,14 @@ export default function RoleManagementPage() {
             )}
           </form>
 
-          <Button onClick={() => handleOpenRoleModal()} className="bg-[#12b3d6] hover:bg-[#0fa0bf] h-11 px-6 rounded-xl w-full sm:w-auto shadow-md shadow-cyan-200/50">
-            <Plus size={18} className="mr-2" /> Tambah Role
-          </Button>
+          {canCreate && (
+            <Button onClick={() => handleOpenRoleModal()} className="bg-[#12b3d6] hover:bg-[#0fa0bf] h-11 px-6 rounded-xl w-full sm:w-auto shadow-md shadow-cyan-200/50">
+              <Plus size={18} className="mr-2" /> Tambah Role
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Area Tabel & Pagination */}
       <div className="space-y-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
@@ -154,13 +203,15 @@ export default function RoleManagementPage() {
                   <TableHead className="py-4 px-6 font-semibold text-gray-600">Nama Role</TableHead>
                   <TableHead className="font-semibold text-gray-600">Deskripsi</TableHead>
                   <TableHead className="font-semibold text-gray-600">Total Akses</TableHead>
-                  <TableHead className="text-right px-6 font-semibold text-gray-600">Aksi</TableHead>
+                  {showActionsColumn && (
+                    <TableHead className="text-right px-6 font-semibold text-gray-600">Aksi</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-32 text-center">
+                    <TableCell colSpan={showActionsColumn ? 4 : 3} className="h-32 text-center">
                       <div className="flex justify-center items-center gap-3 text-gray-500">
                         <div className="w-5 h-5 border-2 border-[#12b3d6] border-t-transparent rounded-full animate-spin"></div>
                         Memuat data...
@@ -169,7 +220,7 @@ export default function RoleManagementPage() {
                   </TableRow>
                 ) : roles.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-32 text-center text-gray-500">Tidak ada role ditemukan.</TableCell>
+                    <TableCell colSpan={showActionsColumn ? 4 : 3} className="h-32 text-center text-gray-500">Tidak ada role ditemukan.</TableCell>
                   </TableRow>
                 ) : (
                   roles.map((role) => (
@@ -186,38 +237,48 @@ export default function RoleManagementPage() {
                           {role.permissions?.length || 0} Perizinan
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end items-center gap-2">
-                          <Button 
-                            size="sm" 
-                            className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-[#12b3d6] shadow-sm rounded-lg h-8"
-                            onClick={() => handleOpenAccessModal(role)}
-                            disabled={role.name === 'Superadmin'}
-                          >
-                            <KeyRound size={14} className="mr-2" /> Kelola Akses
-                          </Button>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 h-8 w-8 rounded-lg">
-                                <MoreVertical size={18} />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-gray-100 p-1">
-                              <DropdownMenuItem className="cursor-pointer p-2.5 rounded-lg font-medium hover:bg-cyan-50 hover:text-[#12b3d6]" onClick={() => handleOpenRoleModal(role)}>
-                                <Pencil size={16} className="mr-2" /> Edit Info Role
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer p-2.5 rounded-lg font-medium text-red-600 focus:bg-red-50 focus:text-red-700" 
-                                onClick={() => deleteRole(role.id, currentPage, activeSearch)}
-                                disabled={['Superadmin', 'Admin', 'Client', 'Voter'].includes(role.name)}
+                      {showActionsColumn && (
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end items-center gap-2">
+                            {canAssign && (
+                              <Button 
+                                size="sm" 
+                                className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-[#12b3d6] shadow-sm rounded-lg h-8"
+                                onClick={() => handleOpenAccessModal(role)}
+                                disabled={role.name === 'Superadmin'}
                               >
-                                <Trash2 size={16} className="mr-2" /> Hapus Role
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
+                                <KeyRound size={14} className="mr-2" /> Kelola Akses
+                              </Button>
+                            )}
+
+                            {(canUpdate || canDelete) && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 h-8 w-8 rounded-lg">
+                                    <MoreVertical size={18} />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-gray-100 p-1">
+                                  {canUpdate && (
+                                    <DropdownMenuItem className="cursor-pointer p-2.5 rounded-lg font-medium hover:bg-cyan-50 hover:text-[#12b3d6]" onClick={() => handleOpenRoleModal(role)}>
+                                      <Pencil size={16} className="mr-2" /> Edit Info Role
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canDelete && (
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer p-2.5 rounded-lg font-medium text-red-600 focus:bg-red-50 focus:text-red-700 disabled:opacity-40 disabled:cursor-not-allowed" 
+                                      onClick={() => !PROTECTED_ROLES.includes(role.name) && handleOpenDeleteModal(role)}
+                                      disabled={PROTECTED_ROLES.includes(role.name)}
+                                    >
+                                      <Trash2 size={16} className="mr-2" /> Hapus Role
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -226,7 +287,6 @@ export default function RoleManagementPage() {
           </div>
         </div>
 
-        {/* Navigasi Pagination */}
         <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 bg-white border border-gray-100 rounded-2xl shadow-sm gap-4">
           <div className="text-sm text-gray-500 text-center sm:text-left">
             Menampilkan <span className="font-bold text-gray-900">{startItem}</span> hingga <span className="font-bold text-gray-900">{endItem}</span> dari <span className="font-bold text-gray-900">{roleMeta.total_items}</span> role
@@ -246,13 +306,18 @@ export default function RoleManagementPage() {
         </div>
       </div>
 
-      {/* Modal Form Role */}
+      {/* Modal Form Tambah/Edit Role */}
       {isRoleModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-6 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900">{formData.id ? 'Edit Role' : 'Tambah Role Baru'}</h2>
-              <button onClick={() => setIsRoleModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Shield className="text-[#12b3d6]" size={20} />
+                {formData.id ? 'Edit Role' : 'Tambah Role Baru'}
+              </h2>
+              <button onClick={() => setIsRoleModalOpen(false)} className="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full">
+                <X size={20} />
+              </button>
             </div>
             <form onSubmit={handleRoleSubmit} className="p-6 space-y-5">
               <div className="space-y-2">
@@ -263,19 +328,19 @@ export default function RoleManagementPage() {
                 <Label className="text-gray-700">Deskripsi</Label>
                 <Input value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="h-11 rounded-xl" placeholder="Penjelasan singkat tugas role" />
               </div>
-              <div className="pt-4 flex justify-end gap-3">
+              <div className="pt-4 flex justify-end gap-3 border-t border-gray-50">
                 <Button type="button" variant="outline" className="h-11 px-6 rounded-xl" onClick={() => setIsRoleModalOpen(false)}>Batal</Button>
-                <Button type="submit" className="h-11 px-6 rounded-xl bg-[#12b3d6] hover:bg-[#0fa0bf]">Simpan Role</Button>
+                <Button type="submit" className="h-11 px-6 rounded-xl bg-[#12b3d6] hover:bg-[#0fa0bf] shadow-md shadow-cyan-200/50">Simpan Role</Button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal Kelola Hak Akses */}
+      {/* Modal Kelola Akses */}
       {isAccessModalOpen && selectedRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -283,7 +348,9 @@ export default function RoleManagementPage() {
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">Centang tindakan yang diizinkan untuk role ini di seluruh sistem.</p>
               </div>
-              <button onClick={() => setIsAccessModalOpen(false)} className="text-gray-400 hover:text-gray-600 bg-white rounded-full p-1 border border-gray-200"><X size={20} /></button>
+              <button onClick={() => setIsAccessModalOpen(false)} className="text-gray-400 hover:text-gray-600 bg-white rounded-full p-2 border border-gray-200">
+                <X size={20} />
+              </button>
             </div>
             
             <div className="p-6 overflow-y-auto flex-1 bg-gray-50/50 space-y-5 custom-scrollbar">
@@ -307,8 +374,71 @@ export default function RoleManagementPage() {
 
             <div className="p-6 border-t border-gray-100 bg-white flex justify-end gap-3">
               <Button variant="outline" className="h-11 px-6 rounded-xl" onClick={() => setIsAccessModalOpen(false)}>Batal</Button>
-              <Button onClick={handleSaveAccess} className="h-11 px-6 rounded-xl bg-[#12b3d6] hover:bg-[#0fa0bf]">
+              <Button onClick={handleSaveAccess} className="h-11 px-6 rounded-xl bg-[#12b3d6] hover:bg-[#0fa0bf] shadow-md shadow-cyan-200/50">
                 <CheckSquare size={18} className="mr-2" /> Simpan Hak Akses
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus Role */}
+      {isDeleteModalOpen && deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <AlertTriangle className="text-red-500" size={20} />
+                Hapus Role
+              </h2>
+              <button 
+                onClick={() => { setIsDeleteModalOpen(false); setDeleteTarget(null); }} 
+                className="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-gray-600">
+                Apakah Anda yakin ingin menghapus role berikut?
+              </p>
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                  <Shield size={18} className="text-red-500" />
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900">{deleteTarget.name}</p>
+                  <p className="text-xs text-red-500 mt-0.5">Semua pengguna dengan role ini akan kehilangan akses terkait.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-3xl">
+              <Button 
+                type="button" variant="outline" className="h-11 px-6 rounded-xl"
+                onClick={() => { setIsDeleteModalOpen(false); setDeleteTarget(null); }}
+                disabled={isDeleting}
+              >
+                Batal
+              </Button>
+              <Button 
+                type="button"
+                className="h-11 px-6 rounded-xl bg-red-500 hover:bg-red-600 shadow-md shadow-red-200/50 text-white"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Menghapus...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Trash2 size={16} />
+                    Ya, Hapus Role
+                  </div>
+                )}
               </Button>
             </div>
           </div>

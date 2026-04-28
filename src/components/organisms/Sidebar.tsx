@@ -3,7 +3,8 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DynamicIcon } from '@/components/atoms/DynamicIcon'; // Import atom baru kita
+import { DynamicIcon } from '@/components/atoms/DynamicIcon';
+import Logo from '@/assets/logo.png';
 
 interface SidebarProps {
   menus: any[];
@@ -15,9 +16,13 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ menus, isMobileOpen, isCollapsed, onCloseMobile }) => {
   const location = useLocation();
 
+  const isActive = (path: string) => {
+    if (path === '/dashboard') return location.pathname === '/dashboard';
+    return location.pathname.startsWith(path);
+  };
+
   return (
     <>
-      {/* Overlay Mobile */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 md:hidden transition-opacity" 
@@ -25,39 +30,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ menus, isMobileOpen, isCollaps
         />
       )}
 
-      {/* Sidebar Panel */}
       <aside className={`
-        fixed md:static inset-y-0 left-0 z-50 bg-gray-950 text-white
-        transform transition-all duration-300 ease-in-out flex flex-col border-r border-gray-800
+        fixed md:static inset-y-0 left-0 z-50 bg-white text-gray-800
+        transform transition-all duration-300 ease-in-out flex flex-col border-r border-gray-100 shadow-sm
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         ${isCollapsed ? 'md:w-20' : 'md:w-72 w-72'} 
       `}>
-        {/* Logo Section */}
-        <div className={`flex items-center h-20 px-6 border-b border-gray-800 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+        <div className={`flex items-center h-20 px-6 border-b border-gray-100 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           {isCollapsed ? (
-             <div className="w-10 h-10 bg-[#12b3d6] rounded-xl flex items-center justify-center font-bold text-xl shadow-lg shadow-cyan-900/50">
-                k
-             </div>
+            <img src={Logo} alt="Logo" className="w-12 h-12 object-contain" />
           ) : (
-            <h1 className="text-2xl font-bold tracking-tight whitespace-nowrap overflow-hidden">
-              klik-<span className="text-[#12b3d6]">pilih</span>
-            </h1>
+            <img src={Logo} alt="Logo" className="h-14 w-auto object-contain" />
           )}
-          <Button variant="ghost" size="icon" className="md:hidden text-gray-400 hover:text-white" onClick={onCloseMobile}>
+          <Button variant="ghost" size="icon" className="md:hidden text-gray-400 hover:text-[#12b3d6] hover:bg-cyan-50" onClick={onCloseMobile}>
             <X size={20} />
           </Button>
         </div>
 
-        {/* Navigation Section */}
         <nav className="flex-1 py-6 space-y-2 overflow-y-auto overflow-x-hidden custom-scrollbar px-3">
           {!isCollapsed && (
-            <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4 whitespace-nowrap">
+            <p className="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 whitespace-nowrap">
               Menu Utama
             </p>
           )}
           
           {menus.map((menu) => {
-            const isActive = location.pathname.includes(menu.path); // Lebih fleksibel untuk sub-routing
+            const active = isActive(menu.path);
             return (
               <Link
                 key={menu.id}
@@ -66,42 +64,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ menus, isMobileOpen, isCollaps
                 className={`
                   flex items-center rounded-xl transition-all group relative
                   ${isCollapsed ? 'justify-center p-3' : 'justify-between px-4 py-3'}
-                  ${isActive 
-                    ? 'bg-[#12b3d6] text-white shadow-lg shadow-cyan-900/20' 
-                    : 'text-gray-400 hover:bg-gray-900 hover:text-white'}
+                  ${active
+                    ? 'bg-[#12b3d6] text-white shadow-md shadow-cyan-200/50 font-bold' 
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-[#12b3d6] font-medium'}
                 `}
                 onClick={() => window.innerWidth < 768 && onCloseMobile()}
               >
                 <div className="flex items-center gap-3">
-                  {/* Terapkan Dynamic Icon yang membaca dari database */}
                   <DynamicIcon 
                     name={menu.icon} 
                     size={20} 
-                    className={`shrink-0 ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-[#12b3d6]'}`} 
+                    className={`shrink-0 transition-colors ${active ? 'text-white' : 'text-gray-400 group-hover:text-[#12b3d6]'}`} 
                   />
-                  
                   {!isCollapsed && (
-                    <span className="font-medium text-sm whitespace-nowrap">{menu.name}</span>
+                    <span className="whitespace-nowrap">{menu.name}</span>
                   )}
                 </div>
-                {!isCollapsed && isActive && <ChevronRight size={16} className="shrink-0" />}
+                {!isCollapsed && active && <ChevronRight size={16} className="shrink-0 text-white" />}
               </Link>
             );
           })}
         </nav>
 
-        {/* Footer Sidebar / Info App */}
-        <div className="p-4 border-t border-gray-800">
-           {isCollapsed ? (
-             <div className="flex justify-center text-xs text-gray-600 font-bold">
-               v1
-             </div>
-           ) : (
-            <div className="p-4 bg-gray-900 rounded-xl border border-gray-800">
-              <p className="text-xs text-gray-500">Versi Aplikasi</p>
-              <p className="text-sm font-semibold text-gray-300">v1.0.0-beta</p>
+        <div className="p-4 border-t border-gray-100">
+          {isCollapsed ? (
+            <div className="flex justify-center text-xs text-gray-400 font-bold">
+              v1
             </div>
-           )}
+          ) : (
+            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <p className="text-xs text-gray-500">Versi Aplikasi</p>
+              <p className="text-sm font-bold text-gray-900">v1.0.0-beta</p>
+            </div>
+          )}
         </div>
       </aside>
     </>

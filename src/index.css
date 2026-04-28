@@ -3,7 +3,30 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-primary: #12b3d6; /* Cyan khas logo klik-pilih */
+  --color-primary: #12b3d6;
   --color-primary-foreground: #ffffff;
-  --color-secondary: #4b5563; /* Dark gray */
+  --color-secondary: #4b5563;
+
+  /* ✅ Tambahkan ini untuk shadcn */
+  --color-background: #ffffff;
+  --color-foreground: #0a0a0a;
+
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0a0a0a;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #0a0a0a;
+
+  --color-muted: #f4f4f5;
+  --color-muted-foreground: #71717a;
+
+  --color-accent: #f4f4f5;
+  --color-accent-foreground: #18181b;
+
+  --color-border: #e4e4e7;
+  --color-input: #e4e4e7;
+  --color-ring: #12b3d6;
+
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
 }

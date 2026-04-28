@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useState } from 'react';
 import { useRBAC } from '@/hooks/useRBAC';
 import { Button } from '@/components/ui/button';
@@ -14,17 +15,39 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const checkPermission = (menuName: string, action: string) => {
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return false;
+  try {
+    const user = JSON.parse(userStr);
+    if (user.roles?.some((r: any) => r.name === 'Superadmin')) return true;
+    for (const role of user.roles || []) {
+      for (const perm of role.permissions || []) {
+        if (perm.menu?.name === menuName && perm.action === action) {
+          return true;
+        }
+      }
+    }
+  } catch (e) {
+    return false;
+  }
+  return false;
+};
+
 export default function MenuManagementPage() {
   const { menus, menuMeta, fetchMenus, saveMenu, deleteMenu, isLoading } = useRBAC();
   
-  // State Pagination & Search
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // State Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ id: '', name: '', path: '', icon: '', sort_order: 0, is_active: true });
+
+  const canCreate = checkPermission("Manajemen Menu", "create");
+  const canUpdate = checkPermission("Manajemen Menu", "update");
+  const canDelete = checkPermission("Manajemen Menu", "delete");
+  const showActionsColumn = canUpdate || canDelete;
 
   useEffect(() => {
     fetchMenus(currentPage, activeSearch);
@@ -40,7 +63,6 @@ export default function MenuManagementPage() {
     if (menu) {
       setFormData({ ...menu, id: menu.id.toString() });
     } else {
-      // Set default sort_order menjadi urutan terakhir + 1
       setFormData({ id: '', name: '', path: '', icon: '', sort_order: menuMeta.total_items + 1, is_active: true });
     }
     setIsModalOpen(true);
@@ -86,7 +108,6 @@ export default function MenuManagementPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       
-      {/* Header & Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Manajemen Menu</h1>
@@ -109,13 +130,14 @@ export default function MenuManagementPage() {
             )}
           </form>
 
-          <Button onClick={() => handleOpenModal()} className="bg-[#12b3d6] hover:bg-[#0fa0bf] h-11 px-6 rounded-xl w-full sm:w-auto shadow-md shadow-cyan-200/50">
-            <Plus size={18} className="mr-2" /> Tambah Menu
-          </Button>
+          {canCreate && (
+            <Button onClick={() => handleOpenModal()} className="bg-[#12b3d6] hover:bg-[#0fa0bf] h-11 px-6 rounded-xl w-full sm:w-auto shadow-md shadow-cyan-200/50">
+              <Plus size={18} className="mr-2" /> Tambah Menu
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Area Tabel & Pagination */}
       <div className="space-y-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
@@ -127,13 +149,15 @@ export default function MenuManagementPage() {
                   <TableHead className="font-semibold text-gray-600">Path / URL</TableHead>
                   <TableHead className="font-semibold text-gray-600">Ikon (Lucide)</TableHead>
                   <TableHead className="font-semibold text-gray-600">Status Visibilitas</TableHead>
-                  <TableHead className="text-right px-6 font-semibold text-gray-600">Aksi</TableHead>
+                  {showActionsColumn && (
+                    <TableHead className="text-right px-6 font-semibold text-gray-600">Aksi</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center">
+                    <TableCell colSpan={showActionsColumn ? 6 : 5} className="h-32 text-center">
                       <div className="flex justify-center items-center gap-3 text-gray-500">
                         <div className="w-5 h-5 border-2 border-[#12b3d6] border-t-transparent rounded-full animate-spin"></div>
                         Memuat data...
@@ -142,7 +166,7 @@ export default function MenuManagementPage() {
                   </TableRow>
                 ) : menus.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-gray-500">
+                    <TableCell colSpan={showActionsColumn ? 6 : 5} className="h-32 text-center text-gray-500">
                       <div className="flex flex-col items-center justify-center">
                         <ListTree size={32} className="text-gray-300 mb-2" />
                         Tidak ada menu ditemukan.
@@ -167,7 +191,6 @@ export default function MenuManagementPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-gray-600">
-                          {/* Placeholder icon rendering based on text could be complex, so we show the name with a generic icon */}
                           <LayoutTemplate size={16} className="text-gray-400"/>
                           <span className="text-sm">{menu.icon || 'default'}</span>
                         </div>
@@ -179,26 +202,32 @@ export default function MenuManagementPage() {
                           <Badge className="bg-gray-100 text-gray-500 hover:bg-gray-200 border-none px-2.5 py-0.5 rounded-md">Sembunyi</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right px-6">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 h-8 w-8 rounded-lg">
-                              <MoreVertical size={18} />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-gray-100 p-1">
-                            <DropdownMenuItem className="cursor-pointer p-2.5 rounded-lg font-medium hover:bg-cyan-50 hover:text-[#12b3d6]" onClick={() => handleOpenModal(menu)}>
-                              <Pencil size={16} className="mr-2" /> Edit Data Menu
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="cursor-pointer p-2.5 rounded-lg font-medium text-red-600 focus:bg-red-50 focus:text-red-700" 
-                              onClick={() => deleteMenu(menu.id, currentPage, activeSearch)}
-                            >
-                              <Trash2 size={16} className="mr-2" /> Hapus Menu
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+                      {showActionsColumn && (
+                        <TableCell className="text-right px-6">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 h-8 w-8 rounded-lg">
+                                <MoreVertical size={18} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-gray-100 p-1">
+                              {canUpdate && (
+                                <DropdownMenuItem className="cursor-pointer p-2.5 rounded-lg font-medium hover:bg-cyan-50 hover:text-[#12b3d6]" onClick={() => handleOpenModal(menu)}>
+                                  <Pencil size={16} className="mr-2" /> Edit Data Menu
+                                </DropdownMenuItem>
+                              )}
+                              {canDelete && (
+                                <DropdownMenuItem 
+                                  className="cursor-pointer p-2.5 rounded-lg font-medium text-red-600 focus:bg-red-50 focus:text-red-700" 
+                                  onClick={() => deleteMenu(menu.id, currentPage, activeSearch)}
+                                >
+                                  <Trash2 size={16} className="mr-2" /> Hapus Menu
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -207,7 +236,6 @@ export default function MenuManagementPage() {
           </div>
         </div>
 
-        {/* Navigasi Pagination */}
         <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 bg-white border border-gray-100 rounded-2xl shadow-sm gap-4">
           <div className="text-sm text-gray-500 text-center sm:text-left">
             Menampilkan <span className="font-bold text-gray-900">{startItem}</span> hingga <span className="font-bold text-gray-900">{endItem}</span> dari <span className="font-bold text-gray-900">{menuMeta.total_items}</span> menu
@@ -227,7 +255,6 @@ export default function MenuManagementPage() {
         </div>
       </div>
 
-      {/* Modal Form Menu */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">

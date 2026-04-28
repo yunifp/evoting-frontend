@@ -1,38 +1,63 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react';
 import { useRBAC } from '@/hooks/useRBAC';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { KeyRound, Plus, Pencil, Trash2, X, Search, Filter, MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react';
+import { KeyRound, Plus, Pencil, Trash2, X, Search, Filter, MoreVertical, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+const checkPermission = (menuName: string, action: string) => {
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return false;
+  try {
+    const user = JSON.parse(userStr);
+    if (user.roles?.some((r: any) => r.name === 'Superadmin')) return true;
+    for (const role of user.roles || []) {
+      for (const perm of role.permissions || []) {
+        if (perm.menu?.name === menuName && perm.action === action) {
+          return true;
+        }
+      }
+    }
+  } catch (e) {
+    return false;
+  }
+  return false;
+};
+
 export default function PermissionManagementPage() {
-  // Ambil fungsi terkait permissions & menus dari hook
   const { 
     permissionsPaginated, permissionMeta, fetchPermissions, savePermission, deletePermission,
     menus, fetchMenus, isLoading 
   } = useRBAC();
   
-  // State Pagination & Search & Filter
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [menuFilter, setMenuFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // State Modal Form
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ id: '', name: '', action: '', menu_id: '' });
 
+  // State modal konfirmasi delete
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: any; name: string; action: string; menuName: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const canCreate = checkPermission("Manajemen Hak Akses", "create");
+  const canUpdate = checkPermission("Manajemen Hak Akses", "update");
+  const canDelete = checkPermission("Manajemen Hak Akses", "delete");
+  const showActionsColumn = canUpdate || canDelete;
+
   useEffect(() => {
-    // Tarik permissions
     fetchPermissions(currentPage, activeSearch, menuFilter);
   }, [currentPage, activeSearch, menuFilter, fetchPermissions]);
 
   useEffect(() => {
-    // Tarik daftar menu untuk Dropdown Filter & Dropdown Modal Form (Limit besar agar semua menu terambil)
     fetchMenus(1, '', 200);
   }, [fetchMenus]);
 
@@ -62,15 +87,37 @@ export default function PermissionManagementPage() {
       alert("Pilih menu terlebih dahulu!");
       return;
     }
-    
     const payload = {
       name: formData.name,
-      action: formData.action.toLowerCase(), // Pastikan action lowercase (e.g., 'create', 'read')
+      action: formData.action.toLowerCase(),
       menu_id: Number(formData.menu_id)
     };
-    
     const success = await savePermission(payload, formData.id, currentPage, activeSearch, menuFilter);
     if (success) setIsModalOpen(false);
+  };
+
+  // Buka modal konfirmasi delete
+  const handleOpenDeleteModal = (perm: any) => {
+    setDeleteTarget({
+      id: perm.id,
+      name: perm.name,
+      action: perm.action,
+      menuName: perm.menu?.name || 'Menu Terhapus'
+    });
+    setIsDeleteModalOpen(true);
+  };
+
+  // Eksekusi delete
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await deletePermission(deleteTarget.id, currentPage, activeSearch, menuFilter);
+      setIsDeleteModalOpen(false);
+      setDeleteTarget(null);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const renderPaginationButtons = () => {
@@ -100,7 +147,6 @@ export default function PermissionManagementPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       
-      {/* Header & Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Manajemen Hak Akses</h1>
@@ -108,7 +154,6 @@ export default function PermissionManagementPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-          {/* Filter Dropdown Menu */}
           <div className="relative group w-full sm:w-48">
             <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <select
@@ -141,13 +186,14 @@ export default function PermissionManagementPage() {
             )}
           </form>
 
-          <Button onClick={() => handleOpenModal()} className="bg-[#12b3d6] hover:bg-[#0fa0bf] h-11 px-6 rounded-xl w-full sm:w-auto shadow-md shadow-cyan-200/50">
-            <Plus size={18} className="mr-2" /> Tambah Akses
-          </Button>
+          {canCreate && (
+            <Button onClick={() => handleOpenModal()} className="bg-[#12b3d6] hover:bg-[#0fa0bf] h-11 px-6 rounded-xl w-full sm:w-auto shadow-md shadow-cyan-200/50">
+              <Plus size={18} className="mr-2" /> Tambah Akses
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Area Tabel & Pagination */}
       <div className="space-y-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
@@ -157,13 +203,15 @@ export default function PermissionManagementPage() {
                   <TableHead className="py-4 px-6 font-semibold text-gray-600">Nama Hak Akses</TableHead>
                   <TableHead className="font-semibold text-gray-600">Kode Aksi (Action)</TableHead>
                   <TableHead className="font-semibold text-gray-600">Terkait Menu</TableHead>
-                  <TableHead className="text-right px-6 font-semibold text-gray-600">Aksi</TableHead>
+                  {showActionsColumn && (
+                    <TableHead className="text-right px-6 font-semibold text-gray-600">Aksi</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-32 text-center">
+                    <TableCell colSpan={showActionsColumn ? 4 : 3} className="h-32 text-center">
                       <div className="flex justify-center items-center gap-3 text-gray-500">
                         <div className="w-5 h-5 border-2 border-[#12b3d6] border-t-transparent rounded-full animate-spin"></div>
                         Memuat data...
@@ -172,7 +220,7 @@ export default function PermissionManagementPage() {
                   </TableRow>
                 ) : permissionsPaginated.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-32 text-center text-gray-500">
+                    <TableCell colSpan={showActionsColumn ? 4 : 3} className="h-32 text-center text-gray-500">
                        <div className="flex flex-col items-center justify-center">
                         <KeyRound size={32} className="text-gray-300 mb-2" />
                         Tidak ada hak akses ditemukan.
@@ -195,26 +243,32 @@ export default function PermissionManagementPage() {
                           {perm.menu?.name || 'Menu Terhapus'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right px-6">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 h-8 w-8 rounded-lg">
-                              <MoreVertical size={18} />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-gray-100 p-1">
-                            <DropdownMenuItem className="cursor-pointer p-2.5 rounded-lg font-medium hover:bg-cyan-50 hover:text-[#12b3d6]" onClick={() => handleOpenModal(perm)}>
-                              <Pencil size={16} className="mr-2" /> Edit Hak Akses
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="cursor-pointer p-2.5 rounded-lg font-medium text-red-600 focus:bg-red-50 focus:text-red-700" 
-                              onClick={() => deletePermission(perm.id, currentPage, activeSearch, menuFilter)}
-                            >
-                              <Trash2 size={16} className="mr-2" /> Hapus Akses
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+                      {showActionsColumn && (
+                        <TableCell className="text-right px-6">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 h-8 w-8 rounded-lg">
+                                <MoreVertical size={18} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-gray-100 p-1">
+                              {canUpdate && (
+                                <DropdownMenuItem className="cursor-pointer p-2.5 rounded-lg font-medium hover:bg-cyan-50 hover:text-[#12b3d6]" onClick={() => handleOpenModal(perm)}>
+                                  <Pencil size={16} className="mr-2" /> Edit Hak Akses
+                                </DropdownMenuItem>
+                              )}
+                              {canDelete && (
+                                <DropdownMenuItem 
+                                  className="cursor-pointer p-2.5 rounded-lg font-medium text-red-600 focus:bg-red-50 focus:text-red-700" 
+                                  onClick={() => handleOpenDeleteModal(perm)}
+                                >
+                                  <Trash2 size={16} className="mr-2" /> Hapus Akses
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -223,7 +277,6 @@ export default function PermissionManagementPage() {
           </div>
         </div>
 
-        {/* Navigasi Pagination */}
         <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 bg-white border border-gray-100 rounded-2xl shadow-sm gap-4">
           <div className="text-sm text-gray-500 text-center sm:text-left">
             Menampilkan <span className="font-bold text-gray-900">{startItem}</span> hingga <span className="font-bold text-gray-900">{endItem}</span> dari <span className="font-bold text-gray-900">{permissionMeta.total_items}</span> akses
@@ -243,19 +296,20 @@ export default function PermissionManagementPage() {
         </div>
       </div>
 
-      {/* Modal Form Permission */}
+      {/* Modal Form Tambah/Edit */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-6 border-b border-gray-100">
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 <KeyRound className="text-[#12b3d6]" size={20}/>
                 {formData.id ? 'Edit Hak Akses' : 'Tambah Akses Baru'}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full">
+                <X size={20} />
+              </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              
               <div className="space-y-2">
                 <Label className="text-gray-700">Terkait Menu</Label>
                 <div className="relative">
@@ -294,6 +348,76 @@ export default function PermissionManagementPage() {
                 <Button type="submit" className="h-11 px-6 rounded-xl bg-[#12b3d6] hover:bg-[#0fa0bf] shadow-md shadow-cyan-200">Simpan Akses</Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus */}
+      {isDeleteModalOpen && deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <AlertTriangle className="text-red-500" size={20} />
+                Hapus Hak Akses
+              </h2>
+              <button 
+                onClick={() => { setIsDeleteModalOpen(false); setDeleteTarget(null); }} 
+                className="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-gray-600">
+                Apakah Anda yakin ingin menghapus hak akses berikut?
+              </p>
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                  <KeyRound size={18} className="text-red-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-900">{deleteTarget.name}</p>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <code className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-xs font-bold uppercase tracking-wider">
+                      {deleteTarget.action}
+                    </code>
+                    <span className="text-xs text-gray-400">·</span>
+                    <span className="text-xs text-gray-500">{deleteTarget.menuName}</span>
+                  </div>
+                  <p className="text-xs text-red-500 mt-1.5">Role yang menggunakan akses ini akan kehilangan fitur terkait.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-3xl">
+              <Button 
+                type="button" variant="outline" className="h-11 px-6 rounded-xl"
+                onClick={() => { setIsDeleteModalOpen(false); setDeleteTarget(null); }}
+                disabled={isDeleting}
+              >
+                Batal
+              </Button>
+              <Button 
+                type="button"
+                className="h-11 px-6 rounded-xl bg-red-500 hover:bg-red-600 shadow-md shadow-red-200/50 text-white"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Menghapus...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Trash2 size={16} />
+                    Ya, Hapus Akses
+                  </div>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       )}

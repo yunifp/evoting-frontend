@@ -4,11 +4,15 @@ import RegisterPage from './pages/auth/RegisterPage';
 import { ProtectedRoute } from './components/atoms/ProtectedRoute';
 import { DashboardLayout } from './components/templates/DashboardLayout';
 import UserManagementPage from './pages/dashboard/UserManagement';
+import LayananManagementPage from './pages/dashboard/LayananManagementPage';
+import LayananCatalogPage from './pages/dashboard/LayananCatalogPage';
 import MenuManagementPage from './pages/dashboard/MenuManagementPage';
 import RoleManagementPage from './pages/dashboard/RoleManagementPage';
 import PermissionManagementPage from './pages/dashboard/PermissionManagementPage';
+import ClientTransactionPage from './pages/dashboard/ClientTransactionPage';
+import ClientPemiluPage from './pages/dashboard/ClientPemiluPage';
+import ClientPemiluDetailPage from './pages/dashboard/ClientPemiluDetailPage';
 
-// Halaman dummy untuk testing
 const DashboardHome = () => (
   <div>
     <h1 className="text-2xl font-bold mb-4">Selamat Datang di Dashboard</h1>
@@ -25,12 +29,10 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* Protected Dashboard Routes */}
         <Route element={<ProtectedRoute />}>
           <Route
             path="/dashboard/*"
@@ -39,9 +41,13 @@ function App() {
                 <Routes>
                   <Route index element={<DashboardHome />} />
                   <Route path="users" element={<UserManagementPage />} />
-                  <Route path="layanan" element={<div>Halaman Manajemen Layanan</div>} />
+                  <Route path="layanan" element={<LayananManagementPage />} />
+                  <Route path="katalog-layanan" element={<LayananCatalogPage />} />
                   <Route path="menus" element={<MenuManagementPage />} />
                   <Route path="roles" element={<RoleManagementPage />} />
+                  <Route path="transactions" element={<ClientTransactionPage />} />
+                  <Route path="pemilu" element={<ClientPemiluPage />} />
+                  <Route path="pemilu/:id" element={<ClientPemiluDetailPage />} />
                   <Route path="permissions" element={<PermissionManagementPage />} />
                 </Routes>
               </DashboardLayout>

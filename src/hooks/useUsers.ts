@@ -5,28 +5,36 @@ import api from '@/lib/axios';
 
 export const useUsers = () => {
   const [users, setUsers] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [meta, setMeta] = useState({ 
     current_page: 1, 
     total_pages: 1, 
     total_items: 0,
-    limit: 10 // Pastikan ada default limit
+    limit: 10
   });
 
   const fetchUsers = useCallback(async (page = 1, search = '', role = '') => {
     setIsLoading(true);
     try {
-      // Panggil API dengan parameter (limit kita set 5 dulu agar pagination cepat terlihat saat testing)
       const response = await api.get('/admin/users', {
         params: { page, limit: 5, search, role } 
       });
       setUsers(response.data.data);
-      // Simpan seluruh meta data dari backend
       setMeta(response.data.meta);
     } catch (err) {
-      console.error("Gagal mengambil data user", err);
+      console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  const fetchRoles = useCallback(async () => {
+    try {
+      const response = await api.get('/admin/roles', { params: { limit: 100 } });
+      setRoles(response.data.data);
+    } catch (err) {
+      console.error(err);
     }
   }, []);
 
@@ -48,5 +56,17 @@ export const useUsers = () => {
     }
   };
 
-  return { users, isLoading, meta, fetchUsers, approveUser, toggleStatus };
+  const createUser = async (data: any) => {
+    await api.post('/admin/users', data);
+  };
+
+  const updateUser = async (id: string, data: any) => {
+    await api.put(`/admin/users/${id}`, data);
+  };
+
+  const deleteUser = async (id: string) => {
+    await api.delete(`/admin/users/${id}`);
+  };
+
+  return { users, roles, isLoading, meta, fetchUsers, fetchRoles, approveUser, toggleStatus, createUser, updateUser, deleteUser };
 };
