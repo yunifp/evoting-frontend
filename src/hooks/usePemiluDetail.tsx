@@ -39,19 +39,30 @@ export const usePemiluDetail = (pemiluId: string) => {
   };
 
   const addDpt = async (data: any) => {
-    await api.post(`/client/pemilu/${pemiluId}/dpt`, data);
+    const res = await api.post(`/client/pemilu/${pemiluId}/dpt`, data);
     fetchDpts();
+    return res;
   };
 
   const publishPemilu = async () => {
     try {
       await api.patch(`/client/pemilu/${pemiluId}/publish`);
-      fetchDetail(); // Refresh data
+      fetchDetail();
       alert("Acara berhasil diaktifkan!");
     } catch (error: any) {
       alert(error.response?.data?.error || "Gagal mengaktifkan acara");
     }
   };
 
-  return { pemilu, dpts, isLoading, fetchDetail, fetchDpts, addKandidat, deleteKandidat, addDpt, publishPemilu };
+  const closePemilu = async () => {
+    try {
+      await api.patch(`/client/pemilu/${pemiluId}/close`);
+      fetchDetail();
+      alert("Acara berhasil ditutup!");
+    } catch (error: any) {
+      alert(error.response?.data?.error || "Gagal menutup acara");
+    }
+  };
+
+  return { pemilu, dpts, isLoading, fetchDetail, fetchDpts, addKandidat, deleteKandidat, addDpt, publishPemilu, closePemilu };
 };

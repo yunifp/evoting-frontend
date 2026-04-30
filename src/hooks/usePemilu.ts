@@ -18,10 +18,31 @@ export const usePemilu = () => {
     }
   }, []);
 
-  const createPemilu = async (data: { title: string; start_date: string; end_date: string }) => {
+  // FUNGSI BARU
+  const getAvailablePackages = useCallback(async () => {
+    try {
+      const response = await api.get('/client/pemilu/available-packages');
+      return response.data.data;
+    } catch (err) {
+      console.error(err);
+      return [];
+    }
+  }, []);
+
+  const createPemilu = async (data: any) => {
     const response = await api.post('/client/pemilu', data);
     return response.data;
   };
 
-  return { pemilus, isLoading, getMyPemilus, createPemilu };
+  const updatePemilu = async (id: string | number, data: any) => {
+    const response = await api.put(`/client/pemilu/${id}`, data);
+    return response.data;
+  };
+
+  const deletePemilu = async (id: string | number) => {
+    const response = await api.delete(`/client/pemilu/${id}`);
+    return response.data;
+  };
+
+  return { pemilus, isLoading, getMyPemilus, getAvailablePackages, createPemilu, updatePemilu, deletePemilu };
 };

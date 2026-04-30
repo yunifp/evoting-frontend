@@ -5,7 +5,7 @@ import { useLayanan } from '@/hooks/useLayanan';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Package, Plus, Pencil, Trash2, X, Search, MoreVertical, ChevronLeft, ChevronRight, Filter, AlertTriangle } from 'lucide-react';
+import { Package, Plus, Pencil, Trash2, X, Search, MoreVertical, ChevronLeft, ChevronRight, Filter, AlertTriangle, ScanFace } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -54,9 +54,8 @@ export default function LayananManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ id: '', name: '', limit_dpt: 0, price: 0, features: '', is_active: true });
+  const [formData, setFormData] = useState({ id: '', name: '', limit_dpt: 0, price: 0, features: '', is_face_recognition: false, is_active: true });
 
-  // State untuk modal konfirmasi delete
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -96,10 +95,11 @@ export default function LayananManagementPage() {
         limit_dpt: layanan.limit_dpt, 
         price: layanan.price, 
         features: layanan.features || '', 
+        is_face_recognition: layanan.is_face_recognition || false,
         is_active: layanan.is_active 
       });
     } else {
-      setFormData({ id: '', name: '', limit_dpt: 0, price: 0, features: '', is_active: true });
+      setFormData({ id: '', name: '', limit_dpt: 0, price: 0, features: '', is_face_recognition: false, is_active: true });
     }
     setIsModalOpen(true);
   };
@@ -111,6 +111,7 @@ export default function LayananManagementPage() {
       limit_dpt: Number(formData.limit_dpt),
       price: Number(formData.price),
       features: formData.features,
+      is_face_recognition: formData.is_face_recognition,
       is_active: formData.is_active
     };
 
@@ -127,13 +128,11 @@ export default function LayananManagementPage() {
     }
   };
 
-  // Buka modal konfirmasi delete
   const handleOpenDeleteModal = (layanan: any) => {
     setDeleteTarget({ id: layanan.id.toString(), name: layanan.name });
     setIsDeleteModalOpen(true);
   };
 
-  // Eksekusi delete setelah konfirmasi
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -274,8 +273,13 @@ export default function LayananManagementPage() {
                     <TableRow key={layanan.id} className="hover:bg-gray-50/50 transition-colors border-b border-gray-50">
                       <TableCell className="py-4 px-6">
                         <div className="flex flex-col">
-                          <span className="font-bold text-gray-900">{layanan.name}</span>
-                          <span className="text-xs text-gray-500 truncate max-w-[200px]">{layanan.features || '-'}</span>
+                          <span className="font-bold text-gray-900 flex items-center gap-2">
+                            {layanan.name}
+                            {layanan.is_face_recognition && (
+                                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none px-2 rounded">Face Recog</Badge>
+                            )}
+                          </span>
+                          <span className="text-xs text-gray-500 truncate max-w-[200px] mt-1">{layanan.features || '-'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -346,7 +350,6 @@ export default function LayananManagementPage() {
         </div>
       </div>
 
-      {/* Modal Form Tambah/Edit */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
@@ -377,16 +380,34 @@ export default function LayananManagementPage() {
                   <Label className="text-gray-700">Fitur (Deskripsi)</Label>
                   <Input value={formData.features} onChange={(e) => setFormData({...formData, features: e.target.value})} className="h-11 rounded-xl" placeholder="Contoh: Support 24/7, Ekspor Excel" />
                 </div>
-                <div className="flex items-center gap-3 mt-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                  <input 
-                    type="checkbox" id="is_active" className="w-5 h-5 text-[#12b3d6] rounded border-gray-300 focus:ring-[#12b3d6]"
-                    checked={formData.is_active} onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-                  />
-                  <div className="flex flex-col">
-                    <Label htmlFor="is_active" className="cursor-pointer font-bold text-gray-800">Status Aktif</Label>
-                    <p className="text-xs text-gray-500">Jika dicentang, paket ini akan muncul di katalog pembelian Client.</p>
-                  </div>
+
+                {/* Penambahan Grid untuk Toggle Fitur Ekstra */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                    <div className="flex items-start gap-3 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                        <input 
+                            type="checkbox" id="is_face_recognition" className="mt-1 w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            checked={formData.is_face_recognition} onChange={(e) => setFormData({...formData, is_face_recognition: e.target.checked})}
+                        />
+                        <div className="flex flex-col">
+                            <Label htmlFor="is_face_recognition" className="cursor-pointer font-bold text-gray-800 flex items-center gap-1">
+                                <ScanFace size={16} className="text-blue-600"/> Face Recog
+                            </Label>
+                            <p className="text-xs text-gray-500 mt-1">Aktifkan verifikasi wajah & biometrik pemilih.</p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                        <input 
+                            type="checkbox" id="is_active" className="mt-1 w-5 h-5 text-[#12b3d6] rounded border-gray-300 focus:ring-[#12b3d6]"
+                            checked={formData.is_active} onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                        />
+                        <div className="flex flex-col">
+                            <Label htmlFor="is_active" className="cursor-pointer font-bold text-gray-800">Status Aktif</Label>
+                            <p className="text-xs text-gray-500 mt-1">Munculkan di katalog Client.</p>
+                        </div>
+                    </div>
                 </div>
+
               </form>
             </div>
             <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-3xl">
@@ -397,7 +418,6 @@ export default function LayananManagementPage() {
         </div>
       )}
 
-      {/* Modal Konfirmasi Hapus */}
       {isDeleteModalOpen && deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">

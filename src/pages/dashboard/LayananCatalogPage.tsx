@@ -5,7 +5,7 @@ import { useLayanan } from '@/hooks/useLayanan';
 import { useTransactions } from '@/hooks/useTransactions';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, Package, ShoppingCart, X, CreditCard } from 'lucide-react';
+import { CheckCircle2, Package, ShoppingCart, X, CreditCard, ScanFace } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 
@@ -108,6 +108,13 @@ export default function LayananCatalogPage() {
                   </Badge>
 
                   <ul className="space-y-3 flex-1 mb-8">
+                    {/* Tampilkan Biometrik Paling Atas jika Aktif */}
+                    {layanan.is_face_recognition && (
+                        <li className="flex items-start bg-blue-50/50 p-2 rounded-lg -ml-2">
+                            <ScanFace className="h-5 w-5 text-blue-600 shrink-0 mr-3" />
+                            <span className="text-sm text-blue-700 font-bold leading-tight pt-0.5">Sistem Verifikasi Wajah (Biometrik)</span>
+                        </li>
+                    )}
                     {featuresList.map((feature: string, idx: number) => (
                       <li key={idx} className="flex items-start">
                         <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mr-3" />
