@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Link } from 'react-router-dom';
-import { Mail, Lock } from 'lucide-react'; // Gunakan icon lucide
+import { Mail, Lock } from 'lucide-react';
 
 export const LoginForm = () => {
   const { login, isLoading, error } = useAuth();

@@ -15,7 +15,7 @@ export const useAuth = () => {
       const response = await api.post('/auth/login', data);
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
-      navigate('/dashboard'); // Arahkan setelah login sukses
+      navigate('/dashboard'); 
     } catch (err: any) {
       setError(err.response?.data?.error || 'Terjadi kesalahan saat login');
     } finally {

@@ -76,10 +76,10 @@ export default function ClientPemiluDetailPage() {
             setDptForm({ nik: '', nama: '', no_hp: '', face_template: '' });
             fetchDpts();
 
-            if (result.data?.is_face_recognition_active) {
+            if (result.data?.data?.is_face_recognition_active) {
                 alert("DPT beserta Template Wajah (Biometrik) berhasil disimpan!");
             } else {
-                alert("DPT berhasil disimpan. (Catatan: Layanan acara ini tidak mencakup fitur Face Recognition, template wajah diabaikan).");
+                alert("DPT berhasil disimpan.");
             }
         } catch (error: any) {
             alert(error.response?.data?.error || "Gagal menambahkan pemilih");
@@ -110,6 +110,12 @@ export default function ClientPemiluDetailPage() {
                         <div className="flex items-center gap-3 mt-2 text-gray-500">
                             <Badge variant="outline" className="font-mono text-xs text-gray-400 border-gray-200">ID: {pemilu.id}</Badge>
                             <span className="flex items-center text-sm font-medium"><Calendar size={14} className="mr-1.5" /> Dibuat: {new Date(pemilu.created_at).toLocaleDateString('id-ID')}</span>
+                            {/* Tambahan Info Paket di Header */}
+                            {pemilu.transaction?.layanan && (
+                                <Badge className="bg-[#12b3d6]/10 text-[#12b3d6] border-none font-bold">
+                                    Paket: {pemilu.transaction.layanan.name}
+                                </Badge>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -304,6 +310,7 @@ export default function ClientPemiluDetailPage() {
                 </TabsContent>
             </Tabs>
 
+            {/* Modal Tambah Kandidat (Tidak Diubah) */}
             {isKandidatModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-300">
@@ -367,6 +374,7 @@ export default function ClientPemiluDetailPage() {
                 </div>
             )}
 
+            {/* Modal Tambah DPT - DIPERBARUI */}
             {isDptModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300">
@@ -402,21 +410,27 @@ export default function ClientPemiluDetailPage() {
 
                                 <div className="space-y-2">
                                     <Label className="text-gray-700 font-bold text-sm uppercase tracking-wide">Nomor WhatsApp <span className="text-red-500">*</span></Label>
-                                    <Input required type="text" value={dptForm.no_hp} onChange={(e) => setDptForm({ ...dptForm, no_hp: e.target.value.replace(/\D/g, '') })} className="h-14 rounded-2xl font-bold bg-gray-50 text-lg" placeholder="08123456789" />
+                                    <Input required type="text" value={dptForm.no_hp} maxLength={15} onChange={(e) => setDptForm({ ...dptForm, no_hp: e.target.value.replace(/\D/g, '') })} className="h-14 rounded-2xl font-bold bg-gray-50 text-lg" placeholder="08123456789" />
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label className="text-gray-700 font-bold text-sm uppercase tracking-wide flex items-center gap-2">
-                                        <ScanFace size={16} className="text-blue-500"/> Data Wajah (Biometrik)
-                                    </Label>
-                                    <Input 
-                                        type="text" 
-                                        value={dptForm.face_template} 
-                                        onChange={(e) => setDptForm({ ...dptForm, face_template: e.target.value })} 
-                                        className="h-14 rounded-2xl bg-blue-50/30 border-blue-100 text-sm font-mono placeholder:font-sans" 
-                                        placeholder="Masukkan Face Template (Base64/Array)..." 
-                                    />
-                                </div>
+                                {/* LOGIKA KONDISIONAL BERDASARKAN PAKET LAYANAN */}
+                                {pemilu?.transaction?.layanan?.is_face_recognition && (
+                                    <div className="space-y-2 p-4 bg-blue-50/50 border border-blue-100 rounded-2xl">
+                                        <Label className="text-gray-700 font-bold text-sm uppercase tracking-wide flex items-center gap-2">
+                                            <ScanFace size={16} className="text-blue-500"/> Data Wajah (Biometrik)
+                                        </Label>
+                                        <Input 
+                                            type="text" 
+                                            value={dptForm.face_template} 
+                                            onChange={(e) => setDptForm({ ...dptForm, face_template: e.target.value })} 
+                                            className="h-14 rounded-xl bg-white border-blue-200 text-sm font-mono placeholder:font-sans focus-visible:ring-blue-500" 
+                                            placeholder="Masukkan Face Template (Base64/Array)..." 
+                                        />
+                                        <p className="text-xs text-blue-600/80 font-medium mt-1.5 flex items-center gap-1">
+                                            <Info size={12} /> Fitur Face Recognition aktif untuk paket layanan acara ini.
+                                        </p>
+                                    </div>
+                                )}
 
                             </form>
                         </div>

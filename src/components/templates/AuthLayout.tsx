@@ -6,11 +6,10 @@ interface AuthLayoutProps {
   children: React.ReactNode;
   title: string;
   subtitle: string;
-  isRegister?: boolean; // Menandai apakah ini halaman register
+  isRegister?: boolean; 
 }
 
 export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle, isRegister = false }) => {
-  // Menu navigasi yang disesuaikan dengan aplikasi e-voting
   const navLinks = [
     { name: "Tentang", path: "/tentang" },
     { name: "Layanan", path: "/layanan" },
@@ -36,10 +35,8 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitl
         </div>
       </div>
 
-      {/* Kolom Form dan Header (Kanan) */}
       <div className="flex-1 bg-white flex flex-col">
         
-        {/* Header Navigasi */}
         <header className="p-6 md:p-8 border-b border-gray-100 flex items-center justify-between">
            <div className="flex items-center gap-6">
               <h1 className="text-2xl font-bold text-gray-900 tracking-tight md:hidden">klik-<span className="text-[#12b3d6]">pilih</span></h1>
@@ -61,7 +58,6 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitl
           </div>
         </header>
 
-        {/* Konten Utama (Form) */}
         <main className="flex-1 flex flex-col justify-center items-center p-8 sm:p-12 md:p-20">
           <div className="w-full max-w-lg space-y-10">
             <div className="text-center md:text-left">

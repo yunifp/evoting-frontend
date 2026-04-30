@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Link } from 'react-router-dom';
-import { Building, Mail, Lock } from 'lucide-react'; // Icon lucide
+import { Building, Mail, Lock } from 'lucide-react'; 
 
 export const RegisterForm = () => {
   const { register, isLoading, error } = useAuth();
