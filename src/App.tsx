@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import { ProtectedRoute } from './components/atoms/ProtectedRoute';
@@ -13,6 +13,9 @@ import ClientTransactionPage from './pages/dashboard/ClientTransactionPage';
 import ClientPemiluPage from './pages/dashboard/ClientPemiluPage';
 import ClientPemiluDetailPage from './pages/dashboard/ClientPemiluDetailPage';
 import ClientLayananStatusPage from './pages/dashboard/ClientLayananStatusPage';
+
+// TAMBAHAN: Import komponen Landing Page
+import LandingPage from './pages/LandingPage'; 
 
 const DashboardHome = () => (
   <div>
@@ -30,10 +33,14 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Rute Landing Page Baru */}
+        <Route path="/" element={<LandingPage />} />
+        
+        {/* Rute Auth */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
 
+        {/* Rute Dashboard Terproteksi */}
         <Route element={<ProtectedRoute />}>
           <Route
             path="/dashboard/*"
