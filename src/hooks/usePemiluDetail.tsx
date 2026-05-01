@@ -28,8 +28,23 @@ export const usePemiluDetail = (pemiluId: string) => {
     }
   }, [pemiluId]);
 
-  const addKandidat = async (data: any) => {
-    await api.post(`/client/pemilu/${pemiluId}/kandidat`, data);
+  // PENYEMPURNAAN: Override header menjadi multipart/form-data khusus untuk upload file
+  const addKandidat = async (data: FormData) => {
+    await api.post(`/client/pemilu/${pemiluId}/kandidat`, data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    fetchDetail();
+  };
+
+  // TAMBAHAN FITUR: Fungsi update kandidat beserta override header
+  const updateKandidat = async (kandidatId: number, data: FormData) => {
+    await api.put(`/client/kandidat/${kandidatId}`, data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     fetchDetail();
   };
 
@@ -64,5 +79,17 @@ export const usePemiluDetail = (pemiluId: string) => {
     }
   };
 
-  return { pemilu, dpts, isLoading, fetchDetail, fetchDpts, addKandidat, deleteKandidat, addDpt, publishPemilu, closePemilu };
+  return { 
+    pemilu, 
+    dpts, 
+    isLoading, 
+    fetchDetail, 
+    fetchDpts, 
+    addKandidat, 
+    updateKandidat, 
+    deleteKandidat, 
+    addDpt, 
+    publishPemilu, 
+    closePemilu 
+  };
 };

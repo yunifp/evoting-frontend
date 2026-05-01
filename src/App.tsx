@@ -50,7 +50,7 @@ function App() {
                   <Route path="pemilu" element={<ClientPemiluPage />} />
                   <Route path="pemilu/:id" element={<ClientPemiluDetailPage />} />
                   <Route path="permissions" element={<PermissionManagementPage />} />
-                  <Route path="layanan-status" element={<ClientLayananStatusPage />} />
+                  <Route path="status" element={<ClientLayananStatusPage />} />
                 </Routes>
               </DashboardLayout>
             }

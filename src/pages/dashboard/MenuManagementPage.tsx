@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRBAC } from '@/hooks/useRBAC';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ListTree, Plus, Pencil, Trash2, X, Search, MoreVertical, ChevronLeft, ChevronRight, LayoutTemplate } from 'lucide-react';
+import { ListTree, Plus, Pencil, Trash2, X, Search, MoreVertical, ChevronLeft, ChevronRight, LayoutTemplate, CornerDownRight } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -28,21 +27,22 @@ const checkPermission = (menuName: string, action: string) => {
         }
       }
     }
-  } catch (e) {
+  } catch (err) {
+    console.error(err);
     return false;
   }
   return false;
 };
 
 export default function MenuManagementPage() {
-  const { menus, menuMeta, fetchMenus, saveMenu, deleteMenu, isLoading } = useRBAC();
+  const { menus, menuMeta, allParentMenus, fetchMenus, fetchAllParentMenus, saveMenu, deleteMenu, isLoading } = useRBAC();
   
   const [searchInput, setSearchInput] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ id: '', name: '', path: '', icon: '', sort_order: 0, is_active: true });
+  const [formData, setFormData] = useState({ id: '', name: '', path: '', icon: '', parent_id: '', sort_order: 0, is_active: true });
 
   const canCreate = checkPermission("Manajemen Menu", "create");
   const canUpdate = checkPermission("Manajemen Menu", "update");
@@ -51,7 +51,8 @@ export default function MenuManagementPage() {
 
   useEffect(() => {
     fetchMenus(currentPage, activeSearch);
-  }, [currentPage, activeSearch, fetchMenus]);
+    fetchAllParentMenus();
+  }, [currentPage, activeSearch, fetchMenus, fetchAllParentMenus]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,9 +62,9 @@ export default function MenuManagementPage() {
 
   const handleOpenModal = (menu?: any) => {
     if (menu) {
-      setFormData({ ...menu, id: menu.id.toString() });
+      setFormData({ ...menu, id: menu.id.toString(), parent_id: menu.parent_id || '' });
     } else {
-      setFormData({ id: '', name: '', path: '', icon: '', sort_order: menuMeta.total_items + 1, is_active: true });
+      setFormData({ id: '', name: '', path: '', icon: '', parent_id: '', sort_order: menuMeta.total_items + 1, is_active: true });
     }
     setIsModalOpen(true);
   };
@@ -74,6 +75,7 @@ export default function MenuManagementPage() {
       name: formData.name,
       path: formData.path,
       icon: formData.icon,
+      parent_id: formData.parent_id ? Number(formData.parent_id) : null,
       sort_order: Number(formData.sort_order),
       is_active: formData.is_active
     };
@@ -121,7 +123,7 @@ export default function MenuManagementPage() {
               placeholder="Cari nama menu..." 
               className="pl-10 pr-10 h-11 w-full rounded-xl border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-[#12b3d6]/20 focus:border-[#12b3d6] transition-all"
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e: any) => setSearchInput(e.target.value)}
             />
             {searchInput && (
               <button type="button" onClick={() => { setSearchInput(''); setActiveSearch(''); setCurrentPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 p-1">
@@ -147,7 +149,7 @@ export default function MenuManagementPage() {
                   <TableHead className="py-4 px-6 font-semibold text-gray-600 w-24">Urutan</TableHead>
                   <TableHead className="font-semibold text-gray-600">Nama Menu</TableHead>
                   <TableHead className="font-semibold text-gray-600">Path / URL</TableHead>
-                  <TableHead className="font-semibold text-gray-600">Ikon (Lucide)</TableHead>
+                  <TableHead className="font-semibold text-gray-600">Ikon</TableHead>
                   <TableHead className="font-semibold text-gray-600">Status Visibilitas</TableHead>
                   {showActionsColumn && (
                     <TableHead className="text-right px-6 font-semibold text-gray-600">Aksi</TableHead>
@@ -160,7 +162,6 @@ export default function MenuManagementPage() {
                     <TableCell colSpan={showActionsColumn ? 6 : 5} className="h-32 text-center">
                       <div className="flex justify-center items-center gap-3 text-gray-500">
                         <div className="w-5 h-5 border-2 border-[#12b3d6] border-t-transparent rounded-full animate-spin"></div>
-                        Memuat data...
                       </div>
                     </TableCell>
                   </TableRow>
@@ -169,66 +170,126 @@ export default function MenuManagementPage() {
                     <TableCell colSpan={showActionsColumn ? 6 : 5} className="h-32 text-center text-gray-500">
                       <div className="flex flex-col items-center justify-center">
                         <ListTree size={32} className="text-gray-300 mb-2" />
-                        Tidak ada menu ditemukan.
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  menus.map((menu) => (
-                    <TableRow key={menu.id} className="hover:bg-gray-50/50 transition-colors border-b border-gray-50">
-                      <TableCell className="py-4 px-6">
-                        <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center font-bold text-sm">
-                          {menu.sort_order}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-bold text-gray-900">
-                        {menu.name}
-                      </TableCell>
-                      <TableCell>
-                        <code className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs border border-gray-200">
-                          {menu.path}
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <LayoutTemplate size={16} className="text-gray-400"/>
-                          <span className="text-sm">{menu.icon || 'default'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {menu.is_active ? (
-                          <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-none px-2.5 py-0.5 rounded-md">Aktif di Sidebar</Badge>
-                        ) : (
-                          <Badge className="bg-gray-100 text-gray-500 hover:bg-gray-200 border-none px-2.5 py-0.5 rounded-md">Sembunyi</Badge>
-                        )}
-                      </TableCell>
-                      {showActionsColumn && (
-                        <TableCell className="text-right px-6">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 h-8 w-8 rounded-lg">
-                                <MoreVertical size={18} />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-gray-100 p-1">
-                              {canUpdate && (
-                                <DropdownMenuItem className="cursor-pointer p-2.5 rounded-lg font-medium hover:bg-cyan-50 hover:text-[#12b3d6]" onClick={() => handleOpenModal(menu)}>
-                                  <Pencil size={16} className="mr-2" /> Edit Data Menu
-                                </DropdownMenuItem>
-                              )}
-                              {canDelete && (
-                                <DropdownMenuItem 
-                                  className="cursor-pointer p-2.5 rounded-lg font-medium text-red-600 focus:bg-red-50 focus:text-red-700" 
-                                  onClick={() => deleteMenu(menu.id, currentPage, activeSearch)}
-                                >
-                                  <Trash2 size={16} className="mr-2" /> Hapus Menu
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                  menus.map((menu: any) => (
+                    <React.Fragment key={menu.id}>
+                      <TableRow className="hover:bg-gray-50/50 transition-colors border-b border-gray-50">
+                        <TableCell className="py-4 px-6">
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center font-bold text-sm">
+                            {menu.sort_order}
+                          </div>
                         </TableCell>
-                      )}
-                    </TableRow>
+                        <TableCell className="font-bold text-gray-900">
+                          {menu.name}
+                        </TableCell>
+                        <TableCell>
+                          <code className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs border border-gray-200">
+                            {menu.path || '#'}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-gray-600">
+                            <LayoutTemplate size={16} className="text-gray-400"/>
+                            <span className="text-sm">{menu.icon || '-'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {menu.is_active ? (
+                            <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-none px-2.5 py-0.5 rounded-md">Aktif</Badge>
+                          ) : (
+                            <Badge className="bg-gray-100 text-gray-500 hover:bg-gray-200 border-none px-2.5 py-0.5 rounded-md">Sembunyi</Badge>
+                          )}
+                        </TableCell>
+                        {showActionsColumn && (
+                          <TableCell className="text-right px-6">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 h-8 w-8 rounded-lg">
+                                  <MoreVertical size={18} />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-gray-100 p-1">
+                                {canUpdate && (
+                                  <DropdownMenuItem className="cursor-pointer p-2.5 rounded-lg font-medium hover:bg-cyan-50 hover:text-[#12b3d6]" onClick={() => handleOpenModal(menu)}>
+                                    <Pencil size={16} className="mr-2" /> Edit Data Menu
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem 
+                                    className="cursor-pointer p-2.5 rounded-lg font-medium text-red-600 focus:bg-red-50 focus:text-red-700" 
+                                    onClick={() => deleteMenu(menu.id, currentPage, activeSearch)}
+                                  >
+                                    <Trash2 size={16} className="mr-2" /> Hapus Menu
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                      
+                      {menu.sub_menus && menu.sub_menus.length > 0 && menu.sub_menus.map((sub: any) => (
+                        <TableRow key={sub.id} className="bg-gray-50/40 hover:bg-gray-50 transition-colors border-b border-gray-50">
+                          <TableCell className="py-4 px-6">
+                            <div className="flex justify-end pr-2 text-gray-400">
+                              <CornerDownRight size={18} />
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded bg-white border border-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold shadow-sm">
+                                {sub.sort_order}
+                              </div>
+                              {sub.name}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <code className="px-2 py-1 bg-white text-gray-600 rounded text-xs border border-gray-200">
+                              {sub.path}
+                            </code>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-gray-400 italic">Sub-menu</span>
+                          </TableCell>
+                          <TableCell>
+                            {sub.is_active ? (
+                              <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-none px-2.5 py-0.5 rounded-md">Aktif</Badge>
+                            ) : (
+                              <Badge className="bg-gray-100 text-gray-500 hover:bg-gray-200 border-none px-2.5 py-0.5 rounded-md">Sembunyi</Badge>
+                            )}
+                          </TableCell>
+                          {showActionsColumn && (
+                            <TableCell className="text-right px-6">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 h-8 w-8 rounded-lg">
+                                    <MoreVertical size={18} />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl border-gray-100 p-1">
+                                  {canUpdate && (
+                                    <DropdownMenuItem className="cursor-pointer p-2.5 rounded-lg font-medium hover:bg-cyan-50 hover:text-[#12b3d6]" onClick={() => handleOpenModal(sub)}>
+                                      <Pencil size={16} className="mr-2" /> Edit Submenu
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canDelete && (
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer p-2.5 rounded-lg font-medium text-red-600 focus:bg-red-50 focus:text-red-700" 
+                                      onClick={() => deleteMenu(sub.id, currentPage, activeSearch)}
+                                    >
+                                      <Trash2 size={16} className="mr-2" /> Hapus Submenu
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
                   ))
                 )}
               </TableBody>
@@ -266,32 +327,48 @@ export default function MenuManagementPage() {
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              
+              <div className="space-y-2">
+                <Label className="text-gray-700">Parent Menu (Opsional)</Label>
+                <select
+                  value={formData.parent_id || ''}
+                  onChange={(e: any) => setFormData({...formData, parent_id: e.target.value})}
+                  className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-[#12b3d6]/20 focus:border-[#12b3d6] outline-none"
+                >
+                  <option value="">-- Jadikan Menu Utama --</option>
+                  {allParentMenus.map((m: any) => (
+                    m.id.toString() !== formData.id && (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    )
+                  ))}
+                </select>
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-gray-700">Nama Menu</Label>
-                <Input required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="h-11 rounded-xl" placeholder="Contoh: Laporan Data" />
+                <Input required value={formData.name} onChange={(e: any) => setFormData({...formData, name: e.target.value})} className="h-11 rounded-xl" placeholder="Contoh: Laporan Data" />
               </div>
               <div className="space-y-2">
                 <Label className="text-gray-700">Path / URL Tujuan</Label>
-                <Input required value={formData.path} onChange={(e) => setFormData({...formData, path: e.target.value})} className="h-11 rounded-xl font-mono text-sm" placeholder="Contoh: /dashboard/laporan" />
+                <Input value={formData.path} onChange={(e: any) => setFormData({...formData, path: e.target.value})} className="h-11 rounded-xl font-mono text-sm" placeholder="Contoh: /dashboard/laporan" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-gray-700 text-xs">Nama Ikon (Lucide)</Label>
-                  <Input value={formData.icon} onChange={(e) => setFormData({...formData, icon: e.target.value})} className="h-11 rounded-xl" placeholder="Contoh: users" />
+                  <Input value={formData.icon} onChange={(e: any) => setFormData({...formData, icon: e.target.value})} className="h-11 rounded-xl" placeholder="Contoh: users" />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-700 text-xs">Urutan Tampil (Angka)</Label>
-                  <Input type="number" required value={formData.sort_order} onChange={(e) => setFormData({...formData, sort_order: Number(e.target.value)})} className="h-11 rounded-xl" />
+                  <Input type="number" required value={formData.sort_order} onChange={(e: any) => setFormData({...formData, sort_order: Number(e.target.value)})} className="h-11 rounded-xl" />
                 </div>
               </div>
               <div className="flex items-center gap-3 mt-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
                 <input 
                   type="checkbox" id="is_active" className="w-5 h-5 text-[#12b3d6] rounded border-gray-300 focus:ring-[#12b3d6]"
-                  checked={formData.is_active} onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+                  checked={formData.is_active} onChange={(e: any) => setFormData({...formData, is_active: e.target.checked})}
                 />
                 <div className="flex flex-col">
                   <Label htmlFor="is_active" className="cursor-pointer font-bold text-gray-800">Tampilkan di Sidebar</Label>
-                  <p className="text-xs text-gray-500">Jika mati, menu tetap bisa diakses lewat URL tapi disembunyikan dari navigasi.</p>
                 </div>
               </div>
               <div className="pt-4 flex justify-end gap-3">

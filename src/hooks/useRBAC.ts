@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback } from 'react';
 import api from '@/lib/axios';
@@ -11,6 +10,7 @@ export const useRBAC = () => {
   // ==========================================
   const [menus, setMenus] = useState<any[]>([]);
   const [menuMeta, setMenuMeta] = useState({ current_page: 1, total_pages: 1, total_items: 0, limit: 10 });
+  const [allParentMenus, setAllParentMenus] = useState<any[]>([]);
 
   const fetchMenus = useCallback(async (page = 1, search = '', limit = 10) => {
     setIsLoading(true);
@@ -27,13 +27,26 @@ export const useRBAC = () => {
     }
   }, []);
 
+  const fetchAllParentMenus = useCallback(async () => {
+    try {
+      const response = await api.get('/admin/menus', {
+        params: { limit: 100 }
+      });
+      setAllParentMenus(response.data.data);
+    } catch (err) {
+      console.error("Gagal mengambil semua menu parent", err);
+    }
+  }, []);
+
   const saveMenu = async (data: any, id?: string, currentPage = 1, currentSearch = '') => {
     try {
       if (id) await api.put(`/admin/menus/${id}`, data);
       else await api.post('/admin/menus', data);
       fetchMenus(currentPage, currentSearch);
+      fetchAllParentMenus();
       return true;
     } catch (err) {
+      console.error(err);
       alert("Gagal menyimpan menu");
       return false;
     }
@@ -44,7 +57,9 @@ export const useRBAC = () => {
     try {
       await api.delete(`/admin/menus/${id}`);
       fetchMenus(currentPage, currentSearch);
+      fetchAllParentMenus();
     } catch (err) {
+      console.error(err);
       alert("Gagal menghapus menu");
     }
   };
@@ -54,7 +69,7 @@ export const useRBAC = () => {
   // ==========================================
   const [permissionsPaginated, setPermissionsPaginated] = useState<any[]>([]);
   const [permissionMeta, setPermissionMeta] = useState({ current_page: 1, total_pages: 1, total_items: 0, limit: 10 });
-  const [allPermissions, setAllPermissions] = useState<any[]>([]); // Untuk kebutuhan Assign Role
+  const [allPermissions, setAllPermissions] = useState<any[]>([]); 
 
   const fetchPermissions = useCallback(async (page = 1, search = '', menuId = '') => {
     setIsLoading(true);
@@ -87,6 +102,7 @@ export const useRBAC = () => {
       fetchPermissions(currentPage, currentSearch, currentMenuFilter);
       return true;
     } catch (err) {
+      console.error(err);
       alert("Gagal menyimpan hak akses");
       return false;
     }
@@ -98,6 +114,7 @@ export const useRBAC = () => {
       await api.delete(`/admin/permissions/${id}`);
       fetchPermissions(currentPage, currentSearch, currentMenuFilter);
     } catch (err) {
+      console.error(err);
       alert("Gagal menghapus hak akses");
     }
   };
@@ -130,6 +147,7 @@ export const useRBAC = () => {
       fetchRoles(currentPage, currentSearch);
       return true;
     } catch (err) {
+      console.error(err);
       alert("Gagal menyimpan role");
       return false;
     }
@@ -141,6 +159,7 @@ export const useRBAC = () => {
       await api.delete(`/admin/roles/${id}`);
       fetchRoles(currentPage, currentSearch);
     } catch (err) {
+      console.error(err);
       alert("Gagal menghapus role. Role inti sistem tidak dapat dihapus.");
     }
   };
@@ -151,6 +170,7 @@ export const useRBAC = () => {
       fetchRoles(currentPage, currentSearch);
       return true;
     } catch (err) {
+      console.error(err);
       alert("Gagal menetapkan hak akses");
       return false;
     }
@@ -158,8 +178,8 @@ export const useRBAC = () => {
 
   return {
     isLoading,
-    menus, menuMeta, fetchMenus, saveMenu, deleteMenu,
-    permissions: allPermissions, fetchAllPermissions, // Masih dipakai RoleManagementPage
+    menus, menuMeta, allParentMenus, fetchMenus, fetchAllParentMenus, saveMenu, deleteMenu,
+    permissions: allPermissions, fetchAllPermissions, 
     permissionsPaginated, permissionMeta, fetchPermissions, savePermission, deletePermission,
     roles, roleMeta, fetchRoles, saveRole, deleteRole, assignPermissionsToRole
   };
