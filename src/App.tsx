@@ -12,6 +12,7 @@ import PermissionManagementPage from './pages/dashboard/PermissionManagementPage
 import ClientTransactionPage from './pages/dashboard/ClientTransactionPage';
 import ClientPemiluPage from './pages/dashboard/ClientPemiluPage';
 import ClientPemiluDetailPage from './pages/dashboard/ClientPemiluDetailPage';
+import ClientLayananStatusPage from './pages/dashboard/ClientLayananStatusPage';
 
 const DashboardHome = () => (
   <div>
@@ -49,6 +50,7 @@ function App() {
                   <Route path="pemilu" element={<ClientPemiluPage />} />
                   <Route path="pemilu/:id" element={<ClientPemiluDetailPage />} />
                   <Route path="permissions" element={<PermissionManagementPage />} />
+                  <Route path="layanan-status" element={<ClientLayananStatusPage />} />
                 </Routes>
               </DashboardLayout>
             }
