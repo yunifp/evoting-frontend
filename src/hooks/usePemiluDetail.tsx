@@ -28,7 +28,6 @@ export const usePemiluDetail = (pemiluId: string) => {
     }
   }, [pemiluId]);
 
-  // PENYEMPURNAAN: Override header menjadi multipart/form-data khusus untuk upload file
   const addKandidat = async (data: FormData) => {
     await api.post(`/client/pemilu/${pemiluId}/kandidat`, data, {
       headers: {
@@ -38,7 +37,6 @@ export const usePemiluDetail = (pemiluId: string) => {
     fetchDetail();
   };
 
-  // TAMBAHAN FITUR: Fungsi update kandidat beserta override header
   const updateKandidat = async (kandidatId: number, data: FormData) => {
     await api.put(`/client/kandidat/${kandidatId}`, data, {
       headers: {
@@ -79,6 +77,16 @@ export const usePemiluDetail = (pemiluId: string) => {
     }
   };
 
+  // FITUR BARU: BROADCAST WA
+  const broadcastWA = async () => {
+    try {
+      const res = await api.post(`/client/pemilu/${pemiluId}/broadcast-invitation`);
+      alert(res.data.message || "Proses broadcast sedang berjalan di latar belakang.");
+    } catch (error: any) {
+      alert(error.response?.data?.error || "Gagal mengirim pesan WA");
+    }
+  };
+
   return { 
     pemilu, 
     dpts, 
@@ -90,6 +98,7 @@ export const usePemiluDetail = (pemiluId: string) => {
     deleteKandidat, 
     addDpt, 
     publishPemilu, 
-    closePemilu 
+    closePemilu,
+    broadcastWA 
   };
 };

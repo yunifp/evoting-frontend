@@ -1,10 +1,14 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable react-hooks/immutability */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMasterData } from '@/hooks/useMasterData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UserPlus, X, Fingerprint, MapPin, Info, ScanFace } from 'lucide-react';
+import { UserPlus, X, Fingerprint, MapPin, Info, ScanFace, Camera, CheckCircle2, Loader2 } from 'lucide-react';
+import { Badge } from '../ui/badge';
+import * as faceapi from 'face-api.js';
 
 interface Props {
     isOpen: boolean;
@@ -20,12 +24,30 @@ const initialDptForm = {
     rt: '', rw: '', kode_pro: '', nama_pro: '', 
     kode_kab: '', nama_kab: '', kode_kec: '', nama_kec: '', 
     kode_kel: '', nama_desa: '', status_kawin: '', 
-    status_disabilitas: '', no_hp: '', face_template: ''
+    status_disabilitas: '', no_hp: '', face_images: [] as string[] // Menerima array 3 gambar
 };
+
+const REQUIRED_POSES = [
+    { id: 'depan', label: 'Hadap Lurus Ke Depan' },
+    { id: 'kanan', label: 'Tengok Arah Tangan Kanan' },
+    { id: 'kiri', label: 'Tengok Arah Tangan Kiri' }
+];
 
 export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Props) {
     const [form, setForm] = useState(initialDptForm);
     const { provinsi, kabupaten, kecamatan, kelurahan, statusKawin, getProvinsi, getKabupaten, getKecamatan, getKelurahan, getStatusKawin, clearWilayah } = useMasterData();
+
+    // STATE UNTUK KAMERA & LIVENESS DETECTION
+    const isFaceRecEnabled = pemilu?.transaction?.layanan?.is_face_recognition;
+    const [isModelsLoaded, setIsModelsLoaded] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const [poseIndex, setPoseIndex] = useState(0);
+    const [holdProgress, setHoldProgress] = useState(0);
+
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const requestRef = useRef<number>();
 
     useEffect(() => {
         if (isOpen) {
@@ -34,13 +56,149 @@ export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Pr
         }
     }, [isOpen, getProvinsi, getStatusKawin]);
 
-    if (!isOpen) return null;
+    // Load AI Model
+    useEffect(() => {
+        if (isOpen && isFaceRecEnabled) {
+            const loadModels = async () => {
+                const MODEL_URL = '/models'; 
+                try {
+                    await Promise.all([
+                        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+                    ]);
+                    setIsModelsLoaded(true);
+                } catch (error) {
+                    console.error("Gagal load model AI wajah", error);
+                }
+            };
+            loadModels();
+        }
+    }, [isOpen, isFaceRecEnabled]);
+
+    // Cleanup kamera
+    useEffect(() => {
+        if (!isOpen) stopCamera();
+    }, [isOpen]);
+
+    const startCamera = async () => {
+        setIsScanning(true);
+        setPoseIndex(0);
+        setHoldProgress(0);
+        setForm({ ...form, face_images: [] });
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
+            streamRef.current = stream;
+            
+            detectLivenessLoop();
+        } catch (err) {
+            alert("Gagal mengakses kamera. Pastikan izin kamera diberikan pada browser Anda.");
+            setIsScanning(false);
+        }
+    };
+
+    const stopCamera = () => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+        if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        setIsScanning(false);
+    };
+
+    const detectLivenessLoop = async () => {
+        if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
+            requestRef.current = requestAnimationFrame(detectLivenessLoop);
+            return;
+        }
+
+        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+
+        if (detection) {
+            const landmarks = detection.landmarks;
+            const nose = landmarks.getNose()[3]; 
+            const jawLeft = landmarks.getJawOutline()[0]; 
+            const jawRight = landmarks.getJawOutline()[16]; 
+
+            // Cuma butuh Yaw (kiri-kanan)
+            const yaw = (nose.x - jawLeft.x) / (jawRight.x - jawLeft.x);
+
+            let detectedPose = '';
+            
+            // SENSITIVITAS SANGAT DIPERLONGGAR! (Nengok dikit langsung nangkep)
+            if (yaw < 0.45) detectedPose = 'kanan'; 
+            else if (yaw > 0.55) detectedPose = 'kiri';
+            else detectedPose = 'depan';
+
+            setPoseIndex((currentIndex) => {
+                const targetPose = REQUIRED_POSES[currentIndex]?.id;
+                
+                if (detectedPose === targetPose) {
+                    setHoldProgress((prev) => {
+                        const nextProgress = prev + 15; // SPEED NAIK! (Dari 10 jadi 15 biar super ngebut)
+                        if (nextProgress >= 100) {
+                            captureCurrentFrame();
+                            return 0; 
+                        }
+                        return nextProgress;
+                    });
+                } else {
+                    // Kalau kedip/goyang dikit, jangan langsung reset ke 0
+                    setHoldProgress((prev) => (prev > 0 ? prev - 5 : 0)); 
+                }
+                return currentIndex;
+            });
+        } else {
+            setHoldProgress((prev) => (prev > 0 ? prev - 10 : 0));
+        }
+
+        requestRef.current = requestAnimationFrame(detectLivenessLoop);
+    };
+
+    const captureCurrentFrame = () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+            
+            setForm(prev => {
+                const newImages = [...prev.face_images, base64Image];
+                // KONDISI BERUBAH JADI 3
+                if (newImages.length === 3) {
+                    stopCamera(); 
+                }
+                return { ...prev, face_images: newImages };
+            });
+
+            setPoseIndex(prev => prev + 1);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // KONDISI BERUBAH JADI 3
+        if (isFaceRecEnabled && form.face_images.length < 3) {
+            alert("Acara ini menggunakan sistem keamanan Biometrik. Anda wajib menyelesaikan verifikasi liveness (3 foto) pemilih.");
+            return;
+        }
+
         await onSubmit(form);
         setForm(initialDptForm);
+        setPoseIndex(0);
     };
+
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
@@ -214,21 +372,74 @@ export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Pr
                                     <Input value={form.status_disabilitas} onChange={(e) => setForm({ ...form, status_disabilitas: e.target.value })} className="h-12 rounded-xl bg-gray-50" placeholder="Normal / Jenis Disabilitas" />
                                 </div>
                                 
-                                {pemilu?.transaction?.layanan?.is_face_recognition && (
-                                    <div className="space-y-2 p-4 bg-blue-50/50 border border-blue-100 rounded-2xl md:col-span-2">
-                                        <Label className="text-gray-700 font-bold text-xs uppercase tracking-wide flex items-center gap-2">
-                                            <ScanFace size={16} className="text-blue-500"/> Face Template (Biometrik Wajah)
-                                        </Label>
-                                        <Input 
-                                            type="text" 
-                                            value={form.face_template} 
-                                            onChange={(e) => setForm({ ...form, face_template: e.target.value })} 
-                                            className="h-12 rounded-xl bg-white border-blue-200 text-sm font-mono placeholder:font-sans focus-visible:ring-blue-500" 
-                                            placeholder="Array Descriptor / Hash Base64..." 
-                                        />
-                                        <p className="text-xs text-blue-600/80 font-medium mt-1.5 flex items-center gap-1">
-                                            <Info size={12} /> Diperlukan karena Face Recognition aktif untuk acara ini.
-                                        </p>
+                                {isFaceRecEnabled && (
+                                    <div className="md:col-span-2 mt-4 border-2 border-dashed border-blue-200 bg-blue-50/50 p-6 rounded-2xl flex flex-col items-center">
+                                        <div className="w-full flex items-center justify-between mb-4">
+                                            <div>
+                                                <h4 className="font-black text-blue-900 flex items-center gap-2"><ScanFace size={20}/> Pas Foto Wajah (Biometrik Liveness)</h4>
+                                                <p className="text-xs text-blue-600 font-medium">Sistem merekam 3 sisi wajah untuk mencegah pemalsuan menggunakan foto/topeng.</p>
+                                            </div>
+                                            {form.face_images.length === 3 && <Badge className="bg-green-100 text-green-700 border-none"><CheckCircle2 size={14} className="mr-1"/> Liveness Lengkap</Badge>}
+                                        </div>
+
+                                        {form.face_images.length === 3 ? (
+                                            <div className="flex flex-col items-center gap-3 my-4 w-full">
+                                                <div className="flex justify-center gap-4 mb-4">
+                                                    {form.face_images.map((img, i) => (
+                                                        <div key={i} className="w-20 h-20 rounded-full overflow-hidden border-4 border-green-500 shadow-md">
+                                                            <img src={img} alt={`Pose ${i+1}`} className="w-full h-full object-cover scale-x-[-1]" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <Button type="button" variant="outline" onClick={() => setForm({...form, face_images: []})} className="text-sm border-gray-300">Ambil Ulang Liveness</Button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-4 w-full">
+                                                {!isModelsLoaded ? (
+                                                    <div className="py-10 flex flex-col items-center text-blue-500">
+                                                        <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                                                        <span className="font-bold text-sm">Menyiapkan Liveness Engine...</span>
+                                                    </div>
+                                                ) : isScanning ? (
+                                                    <div className="relative flex flex-col items-center">
+                                                        <div className="mb-4 text-center">
+                                                            <Badge className="bg-blue-600 text-white font-bold text-sm uppercase px-4 py-1 animate-pulse">
+                                                                {REQUIRED_POSES[poseIndex]?.label}
+                                                            </Badge>
+                                                        </div>
+
+                                                        <div className="relative w-48 h-48 md:w-64 md:h-64 rounded-full border-4 border-blue-600 overflow-hidden shadow-xl bg-black">
+                                                            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                                                            <canvas ref={canvasRef} className="hidden" />
+                                                            
+                                                            <div 
+                                                                className="absolute bottom-0 left-0 right-0 bg-green-500/70 transition-all duration-100"
+                                                                style={{ height: `${holdProgress}%` }}
+                                                            ></div>
+                                                        </div>
+                                                        
+                                                        <div className="flex gap-3 mt-4">
+                                                            {REQUIRED_POSES.map((_, i) => (
+                                                                <div key={i} className={`h-2 rounded-full transition-all duration-300 ${i < poseIndex ? 'bg-green-500 w-8' : i === poseIndex ? 'bg-blue-600 w-4 animate-pulse' : 'bg-blue-200 w-2'}`}></div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-48 h-48 md:w-64 md:h-64 bg-white rounded-full flex items-center justify-center text-gray-300 border-4 border-dashed border-gray-300 shadow-inner">
+                                                        <Camera size={48} />
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-3 mt-4">
+                                                    {isScanning ? (
+                                                        <Button type="button" variant="outline" onClick={stopCamera} className="rounded-full px-8 font-bold bg-white text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600">Batal Scan</Button>
+                                                    ) : (
+                                                        <Button type="button" onClick={startCamera} className="bg-slate-800 hover:bg-slate-700 rounded-full px-8 font-bold text-white shadow-lg">Mulai Liveness Scan</Button>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-slate-500 mt-2 text-center max-w-sm">Arahkan wajah sesuai instruksi. Tahan posisi kepala Anda saat layar menghijau.</p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

@@ -16,6 +16,7 @@ import ClientLayananStatusPage from './pages/dashboard/ClientLayananStatusPage';
 
 // TAMBAHAN: Import komponen Landing Page
 import LandingPage from './pages/LandingPage'; 
+import VotePage from './pages/VotePage';
 
 const DashboardHome = () => (
   <div>
@@ -35,7 +36,7 @@ function App() {
       <Routes>
         {/* Rute Landing Page Baru */}
         <Route path="/" element={<LandingPage />} />
-        
+        <Route path="/vote/:user_uuid" element={<VotePage />} />
         {/* Rute Auth */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

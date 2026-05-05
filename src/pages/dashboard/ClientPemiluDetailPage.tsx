@@ -6,7 +6,7 @@ import { usePemiluDetail } from '@/hooks/usePemiluDetail';
 import { Button } from '@/components/ui/button';
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Vote, Users, ArrowLeft, Info, Calendar } from 'lucide-react';
+import { Vote, Users, ArrowLeft, Info, Calendar, MessageCircle } from 'lucide-react'; // Tambah MessageCircle
 
 import { PemiluInfoTab } from '@/components/organisms/PemiluInfoTab';
 import { KandidatTab } from '@/components/organisms/KandidatTab';
@@ -17,11 +17,14 @@ import { DptModal } from '@/components/organisms/DptModal';
 export default function ClientPemiluDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
-    // Pastikan updateKandidat di-destructure dari hook
-    const { pemilu, dpts, isLoading, fetchDetail, fetchDpts, addKandidat, updateKandidat, deleteKandidat, addDpt, publishPemilu, closePemilu } = usePemiluDetail(id!);
+    const { 
+        pemilu, dpts, isLoading, fetchDetail, fetchDpts, 
+        addKandidat, updateKandidat, deleteKandidat, addDpt, 
+        publishPemilu, closePemilu, broadcastWA // Import fungsi broadcast
+    } = usePemiluDetail(id!);
 
     const [isKandidatModalOpen, setIsKandidatModalOpen] = useState(false);
-    const [selectedKandidat, setSelectedKandidat] = useState<any>(null); // State penyimpan data kandidat yang mau diedit
+    const [selectedKandidat, setSelectedKandidat] = useState<any>(null);
     const [isDptModalOpen, setIsDptModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -32,25 +35,21 @@ export default function ClientPemiluDetailPage() {
         }
     }, [id, fetchDetail, fetchDpts]);
 
-    // Fungsi buka modal untuk TAMBAH
     const handleOpenAddModal = () => {
         setSelectedKandidat(null);
         setIsKandidatModalOpen(true);
     };
 
-    // Fungsi buka modal untuk EDIT
     const handleOpenEditModal = (kandidat: any) => {
         setSelectedKandidat(kandidat);
         setIsKandidatModalOpen(true);
     };
 
-    // Fungsi tutup modal kandidat dengan animasi smooth reset
     const handleCloseKandidatModal = () => {
         setIsKandidatModalOpen(false);
         setTimeout(() => setSelectedKandidat(null), 300);
     };
 
-    // Fungsi Submit (Digunakan untuk Add dan Edit sekaligus)
     const handleSubmitKandidat = async (data: FormData, kandidatId?: number) => {
         setIsSubmitting(true);
         try {
@@ -105,7 +104,6 @@ export default function ClientPemiluDetailPage() {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto pb-12">
-            {/* Header Acara Pemilu */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[#12b3d6]/10 to-transparent rounded-bl-full pointer-events-none"></div>
                 <div className="flex items-center gap-5 relative z-10">
@@ -125,7 +123,8 @@ export default function ClientPemiluDetailPage() {
                         </div>
                     </div>
                 </div>
-                <div className="relative z-10 flex shrink-0">
+                
+                <div className="relative z-10 flex flex-wrap shrink-0 gap-3">
                     {pemilu.status === 'draft' ? (
                         <Button
                             onClick={() => {
@@ -138,16 +137,30 @@ export default function ClientPemiluDetailPage() {
                             🚀 Aktifkan Sekarang
                         </Button>
                     ) : pemilu.status === 'active' ? (
-                        <Button
-                            onClick={() => {
-                                if (window.confirm("Yakin ingin menutup pemilihan ini secara permanen? Pemilih tidak akan bisa memberikan suara lagi dan hasil akan dikunci.")) {
-                                    closePemilu();
-                                }
-                            }}
-                            className="bg-red-500 hover:bg-red-600 text-white px-6 py-6 rounded-2xl font-black shadow-lg shadow-red-200 uppercase tracking-widest flex items-center gap-2"
-                        >
-                            🔒 Tutup Pemilihan
-                        </Button>
+                        <>
+                            {/* TOMBOL BROADCAST WA */}
+                            <Button
+                                onClick={() => {
+                                    if (window.confirm("Sistem akan mengirimkan undangan ke seluruh DPT yang belum memilih. Lanjutkan?")) {
+                                        broadcastWA();
+                                    }
+                                }}
+                                className="bg-green-500 hover:bg-green-600 text-white px-6 py-6 rounded-2xl font-black shadow-lg shadow-green-200 uppercase tracking-widest flex items-center gap-2"
+                            >
+                                <MessageCircle size={20} /> Broadcast WA
+                            </Button>
+                            
+                            <Button
+                                onClick={() => {
+                                    if (window.confirm("Yakin ingin menutup pemilihan ini secara permanen? Pemilih tidak akan bisa memberikan suara lagi dan hasil akan dikunci.")) {
+                                        closePemilu();
+                                    }
+                                }}
+                                className="bg-red-500 hover:bg-red-600 text-white px-6 py-6 rounded-2xl font-black shadow-lg shadow-red-200 uppercase tracking-widest flex items-center gap-2"
+                            >
+                                🔒 Tutup Pemilihan
+                            </Button>
+                        </>
                     ) : (
                         <Badge className="px-5 py-2.5 rounded-2xl uppercase tracking-widest text-sm font-black shadow-sm bg-blue-50 text-blue-700 border border-blue-200">
                             Status: Selesai
@@ -156,7 +169,6 @@ export default function ClientPemiluDetailPage() {
                 </div>
             </div>
 
-            {/* Area Tabs (Navigasi Modul) */}
             <Tabs defaultValue="kandidat" className="w-full flex flex-col gap-6">
                 <TabsList className="flex flex-row w-full bg-gray-100 p-1.5 rounded-2xl h-auto shrink-0 overflow-x-auto shadow-inner">
                     <TabsTrigger value="info" className="flex-1 rounded-xl py-3 font-bold text-gray-500 data-[state=active]:bg-white data-[state=active]:text-[#12b3d6] data-[state=active]:shadow-sm transition-all whitespace-nowrap text-base">
@@ -192,7 +204,6 @@ export default function ClientPemiluDetailPage() {
                 </TabsContent>
             </Tabs>
 
-            {/* Modals */}
             <KandidatModal 
                 isOpen={isKandidatModalOpen} 
                 onClose={handleCloseKandidatModal} 
