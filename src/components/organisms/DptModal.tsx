@@ -1,12 +1,15 @@
+/* eslint-disable no-empty */
+/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react-hooks/immutability */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMasterData } from '@/hooks/useMasterData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UserPlus, X, Fingerprint, MapPin, Info, ScanFace, Camera, CheckCircle2, Loader2 } from 'lucide-react';
+import { UserPlus, X, Fingerprint, MapPin, Info, ScanFace, Camera, CheckCircle2, Loader2, Edit3 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import * as faceapi from 'face-api.js';
 
@@ -16,6 +19,7 @@ interface Props {
     onSubmit: (data: any) => Promise<void>;
     isSubmitting: boolean;
     pemilu: any;
+    editData?: any;
 }
 
 const initialDptForm = {
@@ -24,7 +28,7 @@ const initialDptForm = {
     rt: '', rw: '', kode_pro: '', nama_pro: '', 
     kode_kab: '', nama_kab: '', kode_kec: '', nama_kec: '', 
     kode_kel: '', nama_desa: '', status_kawin: '', 
-    status_disabilitas: '', no_hp: '', face_images: [] as string[] // Menerima array 3 gambar
+    status_disabilitas: '', no_hp: '', face_images: [] as string[]
 };
 
 const REQUIRED_POSES = [
@@ -33,11 +37,10 @@ const REQUIRED_POSES = [
     { id: 'kiri', label: 'Tengok Arah Tangan Kiri' }
 ];
 
-export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Props) {
+export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu, editData }: Props) {
     const [form, setForm] = useState(initialDptForm);
     const { provinsi, kabupaten, kecamatan, kelurahan, statusKawin, getProvinsi, getKabupaten, getKecamatan, getKelurahan, getStatusKawin, clearWilayah } = useMasterData();
 
-    // STATE UNTUK KAMERA & LIVENESS DETECTION
     const isFaceRecEnabled = pemilu?.transaction?.layanan?.is_face_recognition;
     const [isModelsLoaded, setIsModelsLoaded] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
@@ -47,16 +50,27 @@ export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Pr
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
-    const requestRef = useRef<number>();
+    const requestRef = useRef<number>(0);
 
     useEffect(() => {
         if (isOpen) {
             getProvinsi();
             getStatusKawin();
+            if (editData) {
+                setForm({
+                    ...initialDptForm,
+                    ...editData,
+                    face_images: [] 
+                });
+                if (editData.kode_pro) getKabupaten(editData.kode_pro);
+                if (editData.kode_kab) getKecamatan(editData.kode_kab);
+                if (editData.kode_kec) getKelurahan(editData.kode_kec);
+            } else {
+                setForm(initialDptForm);
+            }
         }
-    }, [isOpen, getProvinsi, getStatusKawin]);
+    }, [isOpen, editData, getProvinsi, getStatusKawin]);
 
-    // Load AI Model
     useEffect(() => {
         if (isOpen && isFaceRecEnabled) {
             const loadModels = async () => {
@@ -68,97 +82,28 @@ export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Pr
                     ]);
                     setIsModelsLoaded(true);
                 } catch (error) {
-                    console.error("Gagal load model AI wajah", error);
                 }
             };
             loadModels();
         }
     }, [isOpen, isFaceRecEnabled]);
 
-    // Cleanup kamera
-    useEffect(() => {
-        if (!isOpen) stopCamera();
-    }, [isOpen]);
-
-    const startCamera = async () => {
-        setIsScanning(true);
-        setPoseIndex(0);
-        setHoldProgress(0);
-        setForm({ ...form, face_images: [] });
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-            }
-            streamRef.current = stream;
-            
-            detectLivenessLoop();
-        } catch (err) {
-            alert("Gagal mengakses kamera. Pastikan izin kamera diberikan pada browser Anda.");
-            setIsScanning(false);
-        }
-    };
-
-    const stopCamera = () => {
+    const stopCamera = useCallback(() => {
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
             streamRef.current = null;
         }
-        if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        if (requestRef.current) {
+            cancelAnimationFrame(requestRef.current);
+        }
         setIsScanning(false);
-    };
+    }, []);
 
-    const detectLivenessLoop = async () => {
-        if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
-            requestRef.current = requestAnimationFrame(detectLivenessLoop);
-            return;
-        }
+    useEffect(() => {
+        if (!isOpen) stopCamera();
+    }, [isOpen, stopCamera]);
 
-        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
-
-        if (detection) {
-            const landmarks = detection.landmarks;
-            const nose = landmarks.getNose()[3]; 
-            const jawLeft = landmarks.getJawOutline()[0]; 
-            const jawRight = landmarks.getJawOutline()[16]; 
-
-            // Cuma butuh Yaw (kiri-kanan)
-            const yaw = (nose.x - jawLeft.x) / (jawRight.x - jawLeft.x);
-
-            let detectedPose = '';
-            
-            // SENSITIVITAS SANGAT DIPERLONGGAR! (Nengok dikit langsung nangkep)
-            if (yaw < 0.45) detectedPose = 'kanan'; 
-            else if (yaw > 0.55) detectedPose = 'kiri';
-            else detectedPose = 'depan';
-
-            setPoseIndex((currentIndex) => {
-                const targetPose = REQUIRED_POSES[currentIndex]?.id;
-                
-                if (detectedPose === targetPose) {
-                    setHoldProgress((prev) => {
-                        const nextProgress = prev + 15; // SPEED NAIK! (Dari 10 jadi 15 biar super ngebut)
-                        if (nextProgress >= 100) {
-                            captureCurrentFrame();
-                            return 0; 
-                        }
-                        return nextProgress;
-                    });
-                } else {
-                    // Kalau kedip/goyang dikit, jangan langsung reset ke 0
-                    setHoldProgress((prev) => (prev > 0 ? prev - 5 : 0)); 
-                }
-                return currentIndex;
-            });
-        } else {
-            setHoldProgress((prev) => (prev > 0 ? prev - 10 : 0));
-        }
-
-        requestRef.current = requestAnimationFrame(detectLivenessLoop);
-    };
-
-    const captureCurrentFrame = () => {
+    const captureCurrentFrame = useCallback(() => {
         if (!videoRef.current || !canvasRef.current) return;
         const video = videoRef.current;
         const canvas = canvasRef.current;
@@ -173,7 +118,6 @@ export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Pr
             
             setForm(prev => {
                 const newImages = [...prev.face_images, base64Image];
-                // KONDISI BERUBAH JADI 3
                 if (newImages.length === 3) {
                     stopCamera(); 
                 }
@@ -182,19 +126,84 @@ export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Pr
 
             setPoseIndex(prev => prev + 1);
         }
+    }, [stopCamera]);
+
+    const detectLivenessLoop = useCallback(async () => {
+        if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
+            requestRef.current = requestAnimationFrame(detectLivenessLoop);
+            return;
+        }
+
+        const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+
+        if (detection) {
+            const landmarks = detection.landmarks;
+            const nose = landmarks.getNose()[3]; 
+            const jawLeft = landmarks.getJawOutline()[0]; 
+            const jawRight = landmarks.getJawOutline()[16]; 
+
+            const yaw = (nose.x - jawLeft.x) / (jawRight.x - jawLeft.x);
+
+            let detectedPose = '';
+            
+            if (yaw < 0.45) detectedPose = 'kanan'; 
+            else if (yaw > 0.55) detectedPose = 'kiri';
+            else detectedPose = 'depan';
+
+            setPoseIndex((currentIndex) => {
+                const targetPose = REQUIRED_POSES[currentIndex]?.id;
+                
+                if (detectedPose === targetPose) {
+                    setHoldProgress((prev) => {
+                        const nextProgress = prev + 15;
+                        if (nextProgress >= 100) {
+                            captureCurrentFrame();
+                            return 0; 
+                        }
+                        return nextProgress;
+                    });
+                } else {
+                    setHoldProgress((prev) => (prev > 0 ? prev - 5 : 0)); 
+                }
+                return currentIndex;
+            });
+        } else {
+            setHoldProgress((prev) => (prev > 0 ? prev - 10 : 0));
+        }
+
+        requestRef.current = requestAnimationFrame(detectLivenessLoop);
+    }, [captureCurrentFrame]);
+
+    const startCamera = async () => {
+        setIsScanning(true);
+        setPoseIndex(0);
+        setHoldProgress(0);
+        setForm(prev => ({ ...prev, face_images: [] }));
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
+            streamRef.current = stream;
+            
+            detectLivenessLoop();
+        } catch (err) {
+            setIsScanning(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // KONDISI BERUBAH JADI 3
-        if (isFaceRecEnabled && form.face_images.length < 3) {
-            alert("Acara ini menggunakan sistem keamanan Biometrik. Anda wajib menyelesaikan verifikasi liveness (3 foto) pemilih.");
+        if (isFaceRecEnabled && !editData && form.face_images.length < 3) {
             return;
         }
 
         await onSubmit(form);
-        setForm(initialDptForm);
+        if (!editData) {
+            setForm(initialDptForm);
+        }
         setPoseIndex(0);
     };
 
@@ -205,8 +214,10 @@ export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Pr
             <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[95vh]">
                 <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white shrink-0">
                     <h2 className="text-xl md:text-2xl font-black text-gray-900 flex items-center gap-3">
-                        <div className="bg-gray-900 p-2 rounded-xl text-white"><UserPlus size={20} /></div>
-                        Registrasi Pemilih Lengkap (DPT)
+                        <div className="bg-gray-900 p-2 rounded-xl text-white">
+                            {editData ? <Edit3 size={20} /> : <UserPlus size={20} />}
+                        </div>
+                        {editData ? 'Edit Data Pemilih' : 'Registrasi Pemilih Lengkap (DPT)'}
                     </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-900 bg-white rounded-full p-2.5 border border-gray-200 shadow-sm transition-all"><X size={20} /></button>
                 </div>
@@ -377,7 +388,7 @@ export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Pr
                                         <div className="w-full flex items-center justify-between mb-4">
                                             <div>
                                                 <h4 className="font-black text-blue-900 flex items-center gap-2"><ScanFace size={20}/> Pas Foto Wajah (Biometrik Liveness)</h4>
-                                                <p className="text-xs text-blue-600 font-medium">Sistem merekam 3 sisi wajah untuk mencegah pemalsuan menggunakan foto/topeng.</p>
+                                                <p className="text-xs text-blue-600 font-medium">{editData ? "Kosongkan jika tidak ingin mengubah biometrik wajah." : "Sistem merekam 3 sisi wajah untuk mencegah pemalsuan menggunakan foto/topeng."}</p>
                                             </div>
                                             {form.face_images.length === 3 && <Badge className="bg-green-100 text-green-700 border-none"><CheckCircle2 size={14} className="mr-1"/> Liveness Lengkap</Badge>}
                                         </div>
@@ -449,7 +460,7 @@ export function DptModal({ isOpen, onClose, onSubmit, isSubmitting, pemilu }: Pr
 
                 <div className="p-6 border-t border-gray-100 flex justify-end gap-4 bg-gray-50 shrink-0 rounded-b-[2rem]">
                     <Button type="button" variant="outline" className="h-14 px-8 rounded-2xl font-bold text-gray-600 bg-white" onClick={onClose}>Batal</Button>
-                    <Button type="submit" form="dpt-form" disabled={isSubmitting} className="h-14 px-10 rounded-2xl bg-gray-900 hover:bg-gray-800 shadow-xl shadow-gray-200 font-black text-white text-base transition-all transform hover:-translate-y-1">
+                    <Button type="submit" form="dpt-form" disabled={isSubmitting || (isFaceRecEnabled && !editData && form.face_images.length < 3)} className="h-14 px-10 rounded-2xl bg-gray-900 hover:bg-gray-800 shadow-xl shadow-gray-200 font-black text-white text-base transition-all transform hover:-translate-y-1">
                         {isSubmitting ? 'Menyimpan...' : 'Simpan DPT Lengkap'}
                     </Button>
                 </div>

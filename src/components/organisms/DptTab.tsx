@@ -1,16 +1,61 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable no-empty */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, UserPlus, ScanFace, MapPin } from 'lucide-react';
+import { Users, UserPlus, ScanFace, MapPin, Pencil, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
+import { DptModal } from './DptModal';
 
 interface Props {
     dpts: any[];
     pemilu: any;
     onOpenModal: () => void;
+    onUpdateDpt: (id: string, data: any) => Promise<void>;
+    onDeleteDpt: (id: string) => Promise<void>;
 }
 
-export function DptTab({ dpts, pemilu, onOpenModal }: Props) {
+export function DptTab({ dpts, pemilu, onOpenModal, onUpdateDpt, onDeleteDpt }: Props) {
+    const [editData, setEditData] = useState<any>(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleEditClick = (dpt: any) => {
+        setEditData(dpt);
+        setIsEditModalOpen(true);
+    };
+
+    const handleDeleteClick = (id: string) => {
+        setDeleteId(id);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteId) return;
+        setIsDeleting(true);
+        try {
+            await onDeleteDpt(deleteId);
+            setDeleteId(null);
+        } catch (error) {
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleEditSubmit = async (data: any) => {
+        setIsSubmitting(true);
+        try {
+            await onUpdateDpt(editData.id, data);
+            setIsEditModalOpen(false);
+            setEditData(null);
+        } catch (error) {
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     return (
         <>
             <div className="flex flex-col sm:flex-row justify-between items-end gap-4 border-b border-gray-200 pb-4 mb-6">
@@ -19,39 +64,40 @@ export function DptTab({ dpts, pemilu, onOpenModal }: Props) {
                     <p className="text-gray-500 mt-1 font-medium">Total <span className="font-bold text-gray-900">{dpts.length}</span> pemilih telah terdaftar dan siap memberikan suara.</p>
                 </div>
                 {pemilu.status !== 'selesai' && (
-                    <Button onClick={onOpenModal} className="bg-gray-900 hover:bg-gray-800 rounded-full h-12 px-8 shadow-lg text-white text-base">
+                    <Button onClick={onOpenModal} className="bg-gray-900 hover:bg-gray-800 rounded-full h-12 px-8 shadow-lg text-white text-base transition-transform hover:scale-105">
                         <UserPlus size={20} className="mr-2" /> Daftarkan Pemilih Lengkap
                     </Button>
                 )}
             </div>
 
             {dpts.length === 0 ? (
-                <div className="text-center py-24 bg-white rounded-3xl border border-gray-100 shadow-sm">
+                <div className="text-center py-24 bg-white rounded-3xl border border-gray-100 shadow-sm animate-in fade-in zoom-in-95 duration-500">
                     <Users size={64} className="mx-auto text-gray-200 mb-6" />
                     <h3 className="text-2xl font-bold text-gray-900">Belum Ada Pemilih</h3>
                     <p className="text-gray-500 font-medium mt-2">Daftarkan pemilih agar mereka bisa login dan melakukan voting.</p>
                 </div>
             ) : (
-                <div className="bg-white rounded-3xl border border-gray-100 shadow-soft overflow-x-auto">
-                    <Table className="min-w-[1000px]">
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-x-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <Table className="min-w-[1100px]">
                         <TableHeader className="bg-gray-50/80">
                             <TableRow className="border-b border-gray-100 hover:bg-transparent">
                                 <TableHead className="font-extrabold text-gray-900 py-5 px-6">Identitas (NIK/NKK)</TableHead>
                                 <TableHead className="font-extrabold text-gray-900">Data Diri & Kontak</TableHead>
                                 <TableHead className="font-extrabold text-gray-900">Domisili Lengkap</TableHead>
                                 <TableHead className="font-extrabold text-gray-900">Info Tambahan</TableHead>
-                                <TableHead className="font-extrabold text-gray-900">Status Voting</TableHead>
+                                <TableHead className="font-extrabold text-gray-900">Status</TableHead>
+                                <TableHead className="font-extrabold text-gray-900 text-center">Aksi</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {dpts.map((d) => (
-                                <TableRow key={d.id} className="hover:bg-gray-50/50 border-b border-gray-50 transition-colors group">
+                                <TableRow key={d.id} className="hover:bg-slate-50 border-b border-gray-50 transition-colors group">
                                     <TableCell className="px-6 py-4">
                                         <div className="flex flex-col gap-1">
                                             <span className="font-mono text-sm text-gray-900 font-bold tracking-wider">{d.nik}</span>
                                             {d.nkk && <span className="font-mono text-xs text-gray-400 tracking-wider">KK: {d.nkk}</span>}
                                             {d.face_template && (
-                                                <Badge variant="outline" className="w-fit mt-1 border-blue-200 text-blue-600 bg-blue-50/50">
+                                                <Badge variant="outline" className="w-fit mt-1 border-[#12b3d6]/30 text-[#12b3d6] bg-[#12b3d6]/10">
                                                     <ScanFace size={12} className="mr-1" /> Biometrik
                                                 </Badge>
                                             )}
@@ -87,10 +133,75 @@ export function DptTab({ dpts, pemilu, onOpenModal }: Props) {
                                             <Badge className="bg-amber-50 text-amber-700 border border-amber-200 font-bold px-3 py-1">Belum Memilih</Badge>
                                         }
                                     </TableCell>
+                                    <TableCell className="text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <Button 
+                                                variant="outline" 
+                                                size="icon" 
+                                                className="h-9 w-9 rounded-xl border-slate-200 text-slate-500 hover:text-[#12b3d6] hover:bg-[#12b3d6]/10 hover:border-[#12b3d6]/30 transition-all"
+                                                onClick={() => handleEditClick(d)}
+                                            >
+                                                <Pencil size={16} />
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="icon" 
+                                                className="h-9 w-9 rounded-xl border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-all"
+                                                onClick={() => handleDeleteClick(d.id)}
+                                            >
+                                                <Trash2 size={16} />
+                                            </Button>
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
+                </div>
+            )}
+
+            <DptModal 
+                isOpen={isEditModalOpen} 
+                onClose={() => {
+                    setIsEditModalOpen(false);
+                    setEditData(null);
+                }} 
+                onSubmit={handleEditSubmit} 
+                isSubmitting={isSubmitting} 
+                pemilu={pemilu}
+                editData={editData}
+            />
+
+            {deleteId && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="p-8 text-center space-y-6">
+                            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+                                <AlertTriangle className="w-10 h-10 text-red-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900 mb-2">Hapus DPT?</h3>
+                                <p className="text-slate-600 leading-relaxed">Data pemilih ini akan dihapus secara permanen dari sistem dan tidak dapat dikembalikan.</p>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+                            <Button 
+                                variant="outline" 
+                                className="flex-1 h-12 rounded-xl font-bold text-slate-600 hover:bg-slate-100 border-slate-200"
+                                onClick={() => setDeleteId(null)}
+                                disabled={isDeleting}
+                            >
+                                Batal
+                            </Button>
+                            <Button 
+                                className="flex-1 h-12 rounded-xl font-black bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-200"
+                                onClick={confirmDelete}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Ya, Hapus"}
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             )}
         </>

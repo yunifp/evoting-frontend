@@ -1,4 +1,5 @@
 /* eslint-disable preserve-caught-error */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback } from 'react';
 import axios from 'axios';
@@ -28,7 +29,7 @@ export const useVote = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   const getVoterAuth = useCallback(async (uuid: string) => {
     setLoading(true);
@@ -43,7 +44,6 @@ export const useVote = () => {
     }
   }, [baseUrl]);
 
-  // Fungsi baru untuk mengirim gambar ke backend untuk verifikasi
   const verifyFace = async (uuid: string, imageBase64: string) => {
     setIsSubmitting(true);
     try {

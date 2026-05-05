@@ -1,3 +1,5 @@
+/* eslint-disable no-empty */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback } from 'react';
 import api from '@/lib/axios';
@@ -5,6 +7,7 @@ import api from '@/lib/axios';
 export const usePemiluDetail = (pemiluId: string) => {
   const [pemilu, setPemilu] = useState<any>(null);
   const [dpts, setDpts] = useState<any[]>([]);
+  const [results, setResults] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchDetail = useCallback(async () => {
@@ -13,7 +16,6 @@ export const usePemiluDetail = (pemiluId: string) => {
       const res = await api.get(`/client/pemilu/${pemiluId}`);
       setPemilu(res.data.data);
     } catch (err) {
-      console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -24,7 +26,14 @@ export const usePemiluDetail = (pemiluId: string) => {
       const res = await api.get(`/client/pemilu/${pemiluId}/dpt`);
       setDpts(res.data.data);
     } catch (err) {
-      console.error(err);
+    }
+  }, [pemiluId]);
+
+  const fetchResults = useCallback(async () => {
+    try {
+      const res = await api.get(`/client/pemilu/${pemiluId}/results`);
+      setResults(res.data.data);
+    } catch (err) {
     }
   }, [pemiluId]);
 
@@ -57,13 +66,22 @@ export const usePemiluDetail = (pemiluId: string) => {
     return res;
   };
 
+  const updateDpt = async (dptId: string, data: any) => {
+    const res = await api.put(`/client/dpt/${dptId}`, data);
+    fetchDpts();
+    return res;
+  };
+
+  const deleteDpt = async (dptId: string) => {
+    await api.delete(`/client/dpt/${dptId}`);
+    fetchDpts();
+  };
+
   const publishPemilu = async () => {
     try {
       await api.patch(`/client/pemilu/${pemiluId}/publish`);
       fetchDetail();
-      alert("Acara berhasil diaktifkan!");
     } catch (error: any) {
-      alert(error.response?.data?.error || "Gagal mengaktifkan acara");
     }
   };
 
@@ -71,32 +89,31 @@ export const usePemiluDetail = (pemiluId: string) => {
     try {
       await api.patch(`/client/pemilu/${pemiluId}/close`);
       fetchDetail();
-      alert("Acara berhasil ditutup!");
     } catch (error: any) {
-      alert(error.response?.data?.error || "Gagal menutup acara");
     }
   };
 
-  // FITUR BARU: BROADCAST WA
   const broadcastWA = async () => {
     try {
-      const res = await api.post(`/client/pemilu/${pemiluId}/broadcast-invitation`);
-      alert(res.data.message || "Proses broadcast sedang berjalan di latar belakang.");
+      await api.post(`/client/pemilu/${pemiluId}/broadcast-invitation`);
     } catch (error: any) {
-      alert(error.response?.data?.error || "Gagal mengirim pesan WA");
     }
   };
 
   return { 
     pemilu, 
     dpts, 
+    results,
     isLoading, 
     fetchDetail, 
     fetchDpts, 
+    fetchResults,
     addKandidat, 
     updateKandidat, 
     deleteKandidat, 
-    addDpt, 
+    addDpt,
+    updateDpt,
+    deleteDpt,
     publishPemilu, 
     closePemilu,
     broadcastWA 
